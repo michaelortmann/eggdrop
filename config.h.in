@@ -108,6 +108,9 @@
 /* Define to 1 if you have the `getpagesize' function. */
 #undef HAVE_GETPAGESIZE
 
+/* Define to 1 if you have the `getrandom' function. */
+#undef HAVE_GETRANDOM
+
 /* Define to 1 if you have the `getrusage' function. */
 #undef HAVE_GETRUSAGE
 
@@ -168,9 +171,6 @@
 /* Define to 1 if you have the <locale.h> header file. */
 #undef HAVE_LOCALE_H
 
-/* Define to 1 if you have the `lrand48' function. */
-#undef HAVE_LRAND48
-
 /* Define to 1 if you have the <mach-o/dyld.h> header file. */
 #undef HAVE_MACH_O_DYLD_H
 
@@ -227,12 +227,6 @@
 
 /* Define to 1 if you have the <openssl/x509v3.h> header file. */
 #undef HAVE_OPENSSL_X509V3_H
-
-/* Define to 1 if you have the `rand' function. */
-#undef HAVE_RAND
-
-/* Define to 1 if you have the `random' function. */
-#undef HAVE_RANDOM
 
 /* Define to 1 if you have the `RAND_status' function. */
 #undef HAVE_RAND_STATUS

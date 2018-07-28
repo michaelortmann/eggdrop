@@ -133,6 +133,7 @@ static int burst;
 #include "cmdsserv.c"
 #include "tclserv.c"
 
+#include "../../xoroshiro128plus.c"
 
 /*
  *     Bot server queues

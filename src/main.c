@@ -788,6 +788,7 @@ int init_bots();
 int init_modules();
 int init_tcl(int, char **);
 int init_language(int);
+void init_random();
 #ifdef TLS
 int ssl_init();
 #endif
@@ -812,15 +813,6 @@ int mainloop(int toplevel)
    * calls to periodic_timers
    */
   now = time(NULL);
-  /*
-   * FIXME: Get rid of this, it's ugly and wastes lots of cpu.
-   *
-   * pre-1.3.0 Eggdrop had random() in the once a second block below.
-   *
-   * This attempts to keep random() more random by constantly
-   * calling random() and updating the state information.
-   */
-  random();                /* Woop, lets really jumble things */
 
   /* If we want to restart, we have to unwind to the toplevel.
    * Tcl will Panic if we kill the interp with Tcl_Eval in progress.
@@ -1106,10 +1098,10 @@ int main(int arg_c, char **arg_v)
   chanset = NULL;
   egg_memcpy(&nowtm, localtime(&now), sizeof(struct tm));
   lastmin = now / 60;
-  srandom((unsigned int) (now % (getpid() + getppid())));
   init_mem();
   if (argc > 1)
     do_arg();
+  init_random();
   init_language(1);
 
   printf("\n%s\n", version);

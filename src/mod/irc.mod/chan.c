@@ -1631,9 +1631,9 @@ static void set_delay(struct chanset_t *chan, char *nick)
     a_delay = now + 1;
 
   /* Use min value for delay if min greater then or equal to max or if the
-   * difference of max and min is greater than RANDOM_MAX (sanity check).
+   * difference of max and min is greater than EGG_RAND_MAX (sanity check).
    */
-  } else if ((aop_min >= aop_max) || (aop_diff > RANDOM_MAX)) {
+  } else if ((aop_min >= aop_max) || (aop_diff > EGG_RAND_MAX)) {
     a_delay = now + aop_min;
 
   /* Set a random delay based on the difference of max and min */

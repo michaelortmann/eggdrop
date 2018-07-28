@@ -444,7 +444,6 @@ static int tcl_myip STDVAR
   char s[INET_ADDRSTRLEN];
 #endif
 
-
   BADARGS(1, 1, "");
 
   getdccaddr(NULL, s, sizeof s);
@@ -465,8 +464,9 @@ static int tcl_rand STDVAR
   if (i <= 0) {
     Tcl_AppendResult(irp, "random limit must be greater than zero", NULL);
     return TCL_ERROR;
-  } else if (i > RANDOM_MAX) {
-    Tcl_AppendResult(irp, "random limit must be less than ", RANDOM_MAX, NULL);
+  } else if (i > EGG_RAND_MAX) {
+    Tcl_AppendResult(irp, "random limit must be equal to or less than ",
+                     int_to_base10(EGG_RAND_MAX), NULL);
     return TCL_ERROR;
   }
 
