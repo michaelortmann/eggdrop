@@ -455,7 +455,7 @@ static int tcl_rand STDVAR
 {
   long i;
   unsigned long x;
-  char s[11];
+  char s[20];
 
   BADARGS(2, 2, " limit");
 
@@ -465,15 +465,21 @@ static int tcl_rand STDVAR
     Tcl_AppendResult(irp, "random limit must be greater than zero", NULL);
     return TCL_ERROR;
   } else if (i > EGG_RAND_MAX) {
-    Tcl_AppendResult(irp, "random limit must be equal to or less than ",
-                     int_to_base10(EGG_RAND_MAX), NULL);
+    /*
+     * may not be reached, depending of EGG_RAND_MAX
+     * due to atol() returning <= MAX ULONG
+     *                            9223372036854775807
+     *                            7FFFFFFFFFFFFFFF)
+     */
+    egg_snprintf(s, sizeof s, "%lu", EGG_RAND_MAX);
+    Tcl_AppendResult(irp, "random limit must be equal to or less than ", s,
+                     NULL);
     return TCL_ERROR;
   }
 
   x = randint(i);
 
   egg_snprintf(s, sizeof s, "%lu", x);
-
   Tcl_AppendResult(irp, s, NULL);
   return TCL_OK;
 }

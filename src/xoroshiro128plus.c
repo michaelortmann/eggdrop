@@ -125,6 +125,7 @@ void init_random()
 
   printf("DEBUG: s[0] = %lx\n", s[0]);
   printf("DEBUG: s[1] = %lx\n", s[1]);
+  printf("DEBUG: next() = %lu\n", xoroshiro128plus_next());
 }
 
 /*

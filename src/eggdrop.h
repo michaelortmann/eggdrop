@@ -189,7 +189,7 @@
 #  endif
 #endif
 
-#define EGG_RAND_MAX 0x7fffffff /* can be upped, but int_to_base10cant print much bigger number */
+#define EGG_RAND_MAX 0x7fffffffffffffffUL /* should be <= LONG_MAX */
 uint64_t xoroshiro128plus_next();
 #define randint(n) (unsigned long) (xoroshiro128plus_next() % n)
 
