@@ -788,7 +788,7 @@ int init_bots();
 int init_modules();
 int init_tcl(int, char **);
 int init_language(int);
-void init_random();
+void init_random(void);
 #ifdef TLS
 int ssl_init();
 #endif

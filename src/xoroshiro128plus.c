@@ -106,7 +106,7 @@ uint64_t xoroshiro128plus_next(void)
  * its nice, when we stick pieces togather and the result matches that of others
  * gives confidence
  */
-static void init_random(void)
+void init_random(void)
 {
 #ifdef HAVE_GETRANDOM
   printf("DEBUG: have getrandom()\n");
