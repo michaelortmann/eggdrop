@@ -57,7 +57,7 @@
 
 static uint64_t x; /* The state can be seeded with any value. */
 
-static uint64_t splitmix64_next()
+static uint64_t splitmix64_next(void)
 {
   uint64_t z = (x += 0x9e3779b97f4a7c15);
   z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
@@ -97,7 +97,7 @@ uint64_t xoroshiro128plus_next(void)
  * 3. seed = now ^ getpid();
  *    unbroken method, xor instead of mod, getppid was overdoing it, kiss
  * 4. seed = (tp.tv_sec * tp.tv_usec) ^ getpid();
- *    best simple method i can think of, seeds with microseconds ins      tead of seconds only
+ *    best simple method i can think of, seeds with microseconds instead of seconds only
  */
 /*
  * now what we do here is rawly the same as
@@ -106,7 +106,7 @@ uint64_t xoroshiro128plus_next(void)
  * its nice, when we stick pieces togather and the result matches that of others
  * gives confidence
  */
-void init_random()
+static void init_random(void)
 {
 #ifdef HAVE_GETRANDOM
   printf("DEBUG: have getrandom()\n");
@@ -129,15 +129,6 @@ void init_random()
 }
 
 /*
- * TODO:
- */
-/*
-unsigned long randint(int n) {
-	return xoroshiro128plus_next() / (EGG_RAND_MAX + 1.0) * n;
-}
-*/
-
-/*
  * 20180728 M.Ortmann
  * 1. put all other random functions like randint() here?
  * or move this file into the file holding the randint() function?
@@ -152,10 +143,6 @@ unsigned long randint(int n) {
  * und umstellen/testen/ggf. mit sprng wenn crypto benoetigt wird
  * 7. was ist mit dem in entwicklung befindlichen branch mit pbkdf2 mod,
  * das geht zur zeit eigene wege via openssl ?!
- */
-
-/*
- * from src/main.c:mainloop()
  *
  * initial observation:
  *
@@ -186,13 +173,6 @@ unsigned long randint(int n) {
  * my first patch was some tiny lines to main.c:
  * improving on seed
  *
- * #ifndef HAVE_GETRANDOM
- *   printf("DEBUG: dont have getrandom()\n");
- *   random();
- * #endif
- */
-
-/*
  * what about scripts/alltools.tcl - proc randstring ?
  * das sollten wir ggf. umbauen, so dass wir eine c funktion fuer random
  * string direkt bereitstellen

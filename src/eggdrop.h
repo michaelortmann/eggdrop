@@ -189,6 +189,7 @@
 #  endif
 #endif
 
+#include <stdint.h>
 #define EGG_RAND_MAX 0x7fffffffffffffffUL /* should be <= LONG_MAX */
 uint64_t xoroshiro128plus_next();
 #define randint(n) (unsigned long) (xoroshiro128plus_next() % n)
