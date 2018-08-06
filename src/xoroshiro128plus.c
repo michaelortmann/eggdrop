@@ -1,29 +1,12 @@
 /*
  * xoroshiro128plus.c
+ * 20180728 M.Ortmann
  *
+ * splitmix64.c
+ * Written in 2015 by Sebastiano Vigna (vigna@acm.org)
+ *
+ * xoroshiro128plus.c
  * Written in 2015-2018 by David Blackman and Sebastiano Vigna (vigna@acm.org)
- *
- * This is xoroshiro128+ 1.0, our best and fastest small-state generator
- * for floating-point numbers. We suggest to use its upper bits for
- * floating-point generation, as it is slightly faster than
- * xoroshiro128**. It passes all tests we are aware of except for the four
- * lower bits, which might fail linearity tests (and just those), so if
- * low linear complexity is not considered an issue (as it is usually the
- * case) it can be used to generate 64-bit outputs, too; moreover, this
- * generator has a very mild Hamming-weight dependency making our test
- * (http://prng.di.unimi.it/hwd.php) fail after 8 TB of output; we believe
- * this slight bias cannot affect any application. If you are concerned,
- * use xoroshiro128** or xoshiro256+.
- *
- * We suggest to use a sign test to extract a random Boolean value, and
- * right shifts to extract subsets of bits.
- *
- * The state must be seeded so that it is not everywhere zero. If you have
- * a 64-bit seed, we suggest to seed a splitmix64 generator and use its
- * output to fill s. 
- *
- * NOTE: the parameters (a=24, b=16, b=37) of this version give slightly
- * better results in our test than the 2016 version (a=55, b=14, c=37).
  */
 /*
  * Copyright (C) 1999 - 2018 Eggheads Development Team
@@ -87,25 +70,6 @@ uint64_t xoroshiro128plus_next(void)
   return result;
 }
 
-/* 20180728 M.Ortmann */
-/*
- * besides getrandom() i checked and commented on the following fallback seeding functions:
- * 1. seed = now % (getpid() + getppid());
- *    ld method, broken, mod operation reduces number space for seed to MAXPID +MAXPID
- * 2. seed = now;
- *    most simple version, not broken, but least random
- * 3. seed = now ^ getpid();
- *    unbroken method, xor instead of mod, getppid was overdoing it, kiss
- * 4. seed = (tp.tv_sec * tp.tv_usec) ^ getpid();
- *    best simple method i can think of, seeds with microseconds instead of seconds only
- */
-/*
- * now what we do here is rawly the same as
- * http://www.codegists.com/snippet/swift/xoroshiro128plusswift_drhurdle_swift
- * http://www.codegists.com/code/.net-random-number-generator-algorithm/
- * its nice, when we stick pieces togather and the result matches that of others
- * gives confidence
- */
 void init_random(void)
 {
 #ifdef HAVE_GETRANDOM
@@ -129,7 +93,28 @@ void init_random(void)
 }
 
 /*
- * 20180728 M.Ortmann
+ * notes regarding seeding / fallback seeding:
+ *
+ * besides getrandom() i checked and commented on the following fallback seeding functions:
+ * 1. seed = now % (getpid() + getppid());
+ *    old method, broken, mod operation reduces number space for seed to MAXPID + MAXPID
+ * 2. seed = now;
+ *    most simple version, not broken, but least random
+ * 3. seed = now ^ getpid();
+ *    unbroken method, xor instead of mod, getppid was overdoing it, kiss
+ * 4. seed = (tp.tv_sec * tp.tv_usec) ^ getpid();
+ *    best simple method i can think of, seeds with microseconds instead of seconds only
+ *
+ * now what we do here is rawly the same as
+ * http://www.codegists.com/snippet/swift/xoroshiro128plusswift_drhurdle_swift
+ * http://www.codegists.com/code/.net-random-number-generator-algorithm/
+ * its nice, when we stick pieces togather and the result matches that of others
+ * gives confidence
+ *
+ *
+ *
+ * questions:
+ *
  * 1. put all other random functions like randint() here?
  * or move this file into the file holding the randint() function?
  * we rly wanna keep all rand functions at one place
@@ -143,6 +128,8 @@ void init_random(void)
  * und umstellen/testen/ggf. mit sprng wenn crypto benoetigt wird
  * 7. was ist mit dem in entwicklung befindlichen branch mit pbkdf2 mod,
  * das geht zur zeit eigene wege via openssl ?!
+ *
+ *
  *
  * initial observation:
  *
@@ -174,9 +161,8 @@ void init_random(void)
  * improving on seed
  *
  * what about scripts/alltools.tcl - proc randstring ?
- * das sollten wir ggf. umbauen, so dass wir eine c funktion fuer random
- * string direkt bereitstellen
+ * should we modify it to support a direct c function returning a random string?
  *
- * wir koennte auch getrandom() oder next() durchschleifen in c nach tcl,
- * und dann die tcl rand funktion in tcl bauen... ?!
+ * we also could forward getrandom() or next() from c to tcl, and them
+ * built randint() randsrt() etc in tcl
  */
