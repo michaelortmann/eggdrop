@@ -1,12 +1,5 @@
 /*
  * xoroshiro128plus.c
- * 20180728 M.Ortmann
- *
- * splitmix64.c
- * Written in 2015 by Sebastiano Vigna (vigna@acm.org)
- *
- * xoroshiro128plus.c
- * Written in 2015-2018 by David Blackman and Sebastiano Vigna (vigna@acm.org)
  */
 /*
  * Copyright (C) 1999 - 2018 Eggheads Development Team
@@ -53,74 +46,13 @@
  * of the authors and should not be interpreted as representing official policies,
  * either expressed or implied, of the <project name> project.
  */
-
-#include <stdint.h>             /* uint64_t       */
-#include <stdio.h>              /* printf()       */
-#include <unistd.h>             /* getpid()       */
-#include <time.h>               /* time()         */
-#include <sys/time.h>           /* gettimeofday() */
-#include "main.h"               /* EGG_RAND_MAX   */
-#ifdef HAVE_GETRANDOM
-#  include <sys/random.h>
-#endif
-
-/* http://xoshiro.di.unimi.it/splitmix64.c */
-
-static uint64_t x; /* The state can be seeded with any value. */
-
-static uint64_t splitmix64_next(void)
-{
-  uint64_t z = (x += 0x9e3779b97f4a7c15);
-  z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
-  z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
-  return z ^ (z >> 31);
-}
-
-/* http://xoshiro.di.unimi.it/xoroshiro128plus.c */
-
-static inline uint64_t rotl(const uint64_t x, int k)
-{
-  return (x << k) | (x >> (64 - k));
-}
-
-static uint64_t s[2];
-
-uint64_t xoroshiro128plus_next(void)
-{
-  const uint64_t s0 = s[0];
-  uint64_t s1 = s[1];
-  const uint64_t result = s0 + s1;
-
-  s1 ^= s0;
-  s[0] = rotl(s0, 24) ^ s1 ^ (s1 << 16); /* a, b */
-  s[1] = rotl(s1, 37);                   /* c    */
-
-  return result;
-}
-
-void init_random(void)
-{
-#ifdef HAVE_GETRANDOM
-  printf("DEBUG: have getrandom()\n");
-  if (getrandom(&x, sizeof(x), 0) != sizeof(x))
-    fatal("ERROR: getrandom()\n", 0);
-#else
-  printf("DEBUG: dont have getrandom()\n");
-  struct timeval tp;
-  gettimeofday(&tp, NULL);
-  x = (tp.tv_sec * tp.tv_usec) ^ getpid();
-#endif
-  printf("DEBUG: seed = %lx\n", x);
-
-  s[0] = splitmix64_next();
-  s[1] = splitmix64_next();
-
-  printf("DEBUG: s[0] = %lx\n", s[0]);
-  printf("DEBUG: s[1] = %lx\n", s[1]);
-  printf("DEBUG: next() = %lu\n", xoroshiro128plus_next());
-}
-
 /*
+ * splitmix64.c
+ * Written in 2015 by Sebastiano Vigna (vigna@acm.org)
+ *
+ * xoroshiro128plus.c
+ * Written in 2015-2018 by David Blackman and Sebastiano Vigna (vigna@acm.org)
+ *
  * notes regarding seeding / fallback seeding:
  *
  * besides getrandom() i checked and commented on the following fallback seeding functions:
@@ -194,3 +126,69 @@ void init_random(void)
  * we also could forward getrandom() or next() from c to tcl, and them
  * built randint() randsrt() etc in tcl
  */
+
+#include <stdint.h>             /* uint64_t       */
+#include <stdio.h>              /* printf()       */
+#include <unistd.h>             /* getpid()       */
+#include <time.h>               /* time()         */
+#include <sys/time.h>           /* gettimeofday() */
+#include "main.h"               /* EGG_RAND_MAX   */
+#ifdef HAVE_GETRANDOM
+#  include <sys/random.h>
+#endif
+
+/* http://xoshiro.di.unimi.it/splitmix64.c */
+
+static uint64_t x; /* The state can be seeded with any value. */
+
+static uint64_t splitmix64_next(void)
+{
+  uint64_t z = (x += 0x9e3779b97f4a7c15);
+  z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
+  z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
+  return z ^ (z >> 31);
+}
+
+/* http://xoshiro.di.unimi.it/xoroshiro128plus.c */
+
+static inline uint64_t rotl(const uint64_t x, int k)
+{
+  return (x << k) | (x >> (64 - k));
+}
+
+static uint64_t s[2];
+
+uint64_t xoroshiro128plus_next(void)
+{
+  const uint64_t s0 = s[0];
+  uint64_t s1 = s[1];
+  const uint64_t result = s0 + s1;
+
+  s1 ^= s0;
+  s[0] = rotl(s0, 24) ^ s1 ^ (s1 << 16); /* a, b */
+  s[1] = rotl(s1, 37);                   /* c    */
+
+  return result;
+}
+
+void init_random(void)
+{
+#ifdef HAVE_GETRANDOM
+  printf("DEBUG: have getrandom()\n");
+  if (getrandom(&x, sizeof(x), 0) != sizeof(x))
+    fatal("ERROR: getrandom()\n", 0);
+#else
+  printf("DEBUG: dont have getrandom()\n");
+  struct timeval tp;
+  gettimeofday(&tp, NULL);
+  x = (tp.tv_sec * tp.tv_usec) ^ getpid();
+#endif
+  printf("DEBUG: seed = %lx\n", x);
+
+  s[0] = splitmix64_next();
+  s[1] = splitmix64_next();
+
+  printf("DEBUG: s[0] = %lx\n", s[0]);
+  printf("DEBUG: s[1] = %lx\n", s[1]);
+  printf("DEBUG: next() = %lu\n", xoroshiro128plus_next());
+}
