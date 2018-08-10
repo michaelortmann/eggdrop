@@ -104,7 +104,7 @@ static char **argv;
  * modified versions of this bot.
  */
 
-char egg_version[1024] = EGG_STRINGVER;
+char egg_version[32] = EGG_STRINGVER;
 int egg_numver = EGG_NUMVER;
 #ifdef EGG_PATCH
 char egg_patch[] = EGG_PATCH;
