@@ -62,6 +62,7 @@ static int is_compressedfile(char *filename);
 
 #include "tclcompress.c"
 
+int HAVE_SHARE = 1;
 
 /*
  *    Misc functions.
@@ -406,7 +407,10 @@ static char *compress_close()
   rem_help_reference("compress.help");
   rem_tcl_commands(my_tcl_cmds);
   rem_tcl_ints(my_tcl_ints);
-  uff_deltable(compress_uff_table);
+
+  if (HAVE_SHARE) {
+    uff_deltable(compress_uff_table);
+  }
 
   module_undepend(MODULE_NAME);
   return NULL;
@@ -445,12 +449,15 @@ char *compress_start(Function *global_funcs)
   }
 
   share_funcs = module_depend(MODULE_NAME, "share", 2, 3);
-  if (!share_funcs) {
-    module_undepend(MODULE_NAME);
-    return "This module requires share module 2.3 or later.";
+  module_undepend(MODULE_NAME);
+  if (share_funcs) {
+    uff_addtable(compress_uff_table);
+  }
+  else {
+    putlog(LOG_MISC, "*", "This module reduces functionality due to not finding share module 2.3 or later.");
+    HAVE_SHARE = 0;
   }
 
-  uff_addtable(compress_uff_table);
   add_tcl_ints(my_tcl_ints);
   add_tcl_commands(my_tcl_cmds);
   add_help_reference("compress.help");
