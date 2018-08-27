@@ -123,10 +123,11 @@ int con_chan = 0;       /* Foreground: constantly display channel stats? */
 int term_z = 0;         /* Foreground: use the terminal as a partyline?  */
 int use_stderr = 1;     /* Send stuff to stderr instead of logfiles?     */
 
-char configfile[121] = "eggdrop.conf";  /* Default config file name */
-char pid_file[121];                     /* Name of the pid file     */
-char helpdir[121] = "help/";            /* Directory of help files  */
-char textdir[121] = "text/";            /* Directory for text files */
+char configfile[121] = "eggdrop.conf"; /* Default config file name    */
+char pid_file[121];                    /* Name of the pid file        */
+char helpdir[121] = "help/";           /* Directory of help files     */
+char languagedir[121] = "language/";   /* Directory of language files */
+char textdir[121] = "text/";           /* Directory for text files    */
 
 int keep_all_logs = 0;                  /* Never erase logfiles?    */
 int switch_logfiles_at = 300;           /* When to switch logfiles  */
@@ -1116,6 +1117,8 @@ int main(int arg_c, char **arg_v)
   lastmin = now / 60;
   init_random();
   init_mem();
+  if (getenv("EGG_LANGDIR"))
+    puts("warning: EGG_LANGDIR is deprecated, use language-path instead\n");
   if (argc > 1)
     do_arg();
   init_language(1);

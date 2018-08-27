@@ -27,8 +27,6 @@
  *
  * ENVIRONMENT VARIABLES:
  *              EGG_LANG       - language to use (default: "english")
- *              EGG_LANGDIR    - directory with all lang files
- *                               (default: "./language")
  * WILL DO:
  *              Upon loading:
  *              o       default loads section core, if possible.
@@ -64,7 +62,7 @@
 #include "main.h"
 
 extern struct dcc_t *dcc;
-
+extern char languagedir[];
 
 typedef struct lang_st {
   struct lang_st *next;
@@ -374,7 +372,7 @@ static char *get_specific_langfile(char *language, lang_sec *sec)
   char *langfile;
 
   if (!ldir)
-    ldir = LANGDIR;
+    ldir = languagedir;
   langfile = nmalloc(strlen(ldir) + strlen(sec->section) + strlen(language) +
              8);
   sprintf(langfile, "%s/%s.%s.lang", ldir, sec->section, language);
