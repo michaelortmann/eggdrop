@@ -434,7 +434,7 @@ See also: match, who, whom%{+m|m}, chattr%{+t}, botattr
 ###  %bstatus%b
 ###  %bstatus all%b
    Displays a condensed block of status information about the bot.
-   is running. For example:
+   For example:
       [01:15] #Wcc# status
       I am Anakha, running eggdrop v1.6.16+stripping:  171 users (mem: 315k)
       Online for 14 days, 02:50  (background)  CPU 71:29  cache hit 40.3%
@@ -449,7 +449,6 @@ See also: match, who, whom%{+m|m}, chattr%{+t}, botattr
           Server irc.inet.tele.dk:6667 (connected for 11 days)
           #|DAWG|Net:  6 members, enforcing "+istn" (lurking)
           #|DAWG|Tcl: 42 members, enforcing "+tn" (lurking)
-
 
    The first line tells you the bot's name, what version of Eggdrop it's
    running, the number of users the bot has records of, and the amount of
