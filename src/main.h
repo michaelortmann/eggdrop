@@ -150,6 +150,7 @@ extern struct dcc_table DCC_CHAT, DCC_BOT, DCC_LOST, DCC_SCRIPT, DCC_BOT_NEW,
 #define EGG_MACRO_STR(x) EGG_STR(x)
 #define EGG_STR(x) #x
 
+#define EGG_CC EGG_MACRO_STR(EGG_CC_RAW)
 #define EGG_AC_ARGS EGG_MACRO_STR(EGG_AC_ARGS_RAW)
 
 #endif /* _EGG_MAIN_H */

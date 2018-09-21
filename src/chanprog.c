@@ -346,6 +346,7 @@ void tell_verbose_status(int idx)
           s, s1, s2, MISC_CACHEHIT,
           100.0 * ((float) cache_hit) / ((float) (cache_hit + cache_miss)));
 
+  dprintf(idx, "CC: " EGG_CC "\n");
   dprintf(idx, "Configured with: " EGG_AC_ARGS "\n");
   if (admin[0])
     dprintf(idx, "Admin: %s\n", admin);

@@ -37,12 +37,12 @@ AH_BOTTOM([#endif /* !_EGG_CONFIG_H */])
 
 # Print start message
 EGG_MSG_CONFIGURE_START
-EGG_SAVE_PARAMETERS
 
 
 # Check for a working C compiler
 AC_PROG_CC
 EGG_CHECK_CC
+EGG_SAVE_PARAMETERS
 
 # These 3 need to be done before any AC_COMPILE_IFELSE()'s.
 AC_AIX
