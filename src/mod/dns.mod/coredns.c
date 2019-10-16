@@ -723,6 +723,16 @@ void ptrstring(struct sockaddr *addr, char *buf, size_t sz)
  *    Network and resolver related functions
  */
 
+static int dns_check_servercount(void)
+{
+  static int oldcount = -1;
+  if (oldcount != myres.nscount && !myres.nscount) {
+    putlog(LOG_MISC, "*", "No nameservers found. Please set the dns-servers config variable.");
+  }
+  oldcount = myres.nscount;
+  return 0;
+}
+
 /* Create packet for the request and send it to all available nameservers.
  */
 static void dorequest(char *s, int type, uint16_t id)
@@ -738,6 +748,7 @@ static void dorequest(char *s, int type, uint16_t id)
    * CPUs.
    */
   buf = nmalloc(MAX_PACKETSIZE + 1);
+  dns_check_servercount();
   r = RES_MKQUERY(QUERY, s, C_IN, type, NULL, 0, NULL, buf, MAX_PACKETSIZE);
   if (r == -1) {
     nfree(buf);
@@ -1289,10 +1300,6 @@ static int init_dns_core(void)
 
   /* Initialise the resolv library. */
   MY_RES_INIT();
-  if (!myres.nscount) {
-    putlog(LOG_MISC, "*", "No nameservers defined.");
-    return 0;
-  }
   myres.options |= RES_RECURSE | RES_DEFNAMES | RES_DNSRCH;
   for (i = 0; i < myres.nscount; i++)
     myres.nsaddr_list[i].sin_family = AF_INET;

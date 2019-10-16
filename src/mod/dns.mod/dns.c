@@ -224,26 +224,18 @@ static int dns_report(int idx, int details)
     int i, size = dns_expmem();
 
     dprintf(idx, "    Async DNS resolver is active.\n");
-    dprintf(idx, "    DNS server list:");
-    for (i = 0; i < myres.nscount; i++)
-      dprintf(idx, " %s:%d", iptostr((struct sockaddr *) &myres.nsaddr_list[i]),
-              ntohs(myres.nsaddr_list[i].sin_port));
     if (!myres.nscount)
-      dprintf(idx, " NO DNS SERVERS FOUND!\n");
-    dprintf(idx, "\n");
+      dprintf(idx, "    No nameservers found. Please set the dns-servers config variable.\n");
+    else {
+      dprintf(idx, "    DNS server list:");
+      for (i = 0; i < myres.nscount; i++)
+        dprintf(idx, " %s:%d", iptostr((struct sockaddr *) &myres.nsaddr_list[i]),
+                ntohs(myres.nsaddr_list[i].sin_port));
+      dprintf(idx, "\n");
+    }
     dprintf(idx, "    Using %d byte%s of memory\n", size,
             (size != 1) ? "s" : "");
   }
-  return 0;
-}
-
-static int dns_check_servercount(void)
-{
-  static int oldcount = -1;
-  if (oldcount != myres.nscount && !myres.nscount) {
-    putlog(LOG_MISC, "*", "WARNING: No nameservers found. Please set the dns-servers config variable.");
-  }
-  oldcount = myres.nscount;
   return 0;
 }
 
@@ -254,7 +246,6 @@ static char *dns_close()
   del_hook(HOOK_DNS_HOSTBYIP, (Function) dns_lookup);
   del_hook(HOOK_DNS_IPBYHOST, (Function) dns_forward);
   del_hook(HOOK_SECONDLY, (Function) dns_check_expires);
-  del_hook(HOOK_REHASH, (Function) dns_check_servercount);
   rem_tcl_ints(dnsints);
   rem_tcl_strings(dnsstrings);
   Tcl_UntraceVar(interp, "dns-servers",
@@ -317,7 +308,6 @@ char *dns_start(Function *global_funcs)
   add_hook(HOOK_SECONDLY, (Function) dns_check_expires);
   add_hook(HOOK_DNS_HOSTBYIP, (Function) dns_lookup);
   add_hook(HOOK_DNS_IPBYHOST, (Function) dns_forward);
-  add_hook(HOOK_REHASH, (Function) dns_check_servercount);
   add_tcl_ints(dnsints);
   add_tcl_strings(dnsstrings);
   return NULL;
