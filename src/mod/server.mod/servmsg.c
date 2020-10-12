@@ -1936,10 +1936,6 @@ static void server_resolve_success(int servidx)
   changeover_dcc(servidx, &SERVER_SOCKET, 0);
   dcc[servidx].sock = getsock(dcc[servidx].sockname.family, 0);
   setsnport(dcc[servidx].sockname, dcc[servidx].port);
-  /* Setup ident right before opening the socket to the IRC server to minimize
-   * race.
-   */
-  check_tcl_event("ident");
   serv = open_telnet_raw(dcc[servidx].sock, &dcc[servidx].sockname);
   if (serv < 0) {
     char *errstr = NULL;
@@ -1956,6 +1952,14 @@ static void server_resolve_success(int servidx)
     lostdcc(servidx);
     return;
   }
+  /* Setup ident right after opening the socket to the IRC server to get our
+   * client ip/port and to minimize race.
+   */
+  sockname_t addr;
+  getsockname(dcc[servidx].sock, &addr.addr.sa, &addr.addrlen);
+  printf("Local ip      = %s\n", inet_ntoa(addr.addr.s4.sin_addr));
+  printf("Local port is = %i\n", ntohs(addr.addr.s4.sin_port));
+  check_tcl_event("ident");
 #ifdef TLS
   if (dcc[servidx].ssl && ssl_handshake(serv, TLS_CONNECT, tls_vfyserver,
                                         LOG_SERV, dcc[servidx].host, NULL)) {
