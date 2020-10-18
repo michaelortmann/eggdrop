@@ -131,6 +131,7 @@ static void ident_oidentd()
         putlog(LOG_MISC, "*", "IDENT: Error reading oident.conf");
       }
       data = nmalloc(sizeof(char) * (filesize + 256)); /* Room for Eggdrop adds */
+      *data = 0;
 
       /* Read the file into buffer */
       if (fseek(fd, 0, SEEK_SET) != 0) {
