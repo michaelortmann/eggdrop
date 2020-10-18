@@ -107,9 +107,14 @@ static void ident_oidentd()
   FILE *fd;
   long filesize;
   char *data = NULL;
-  char path[121], line[256], buf[256], identstr[256], s[INET_ADDRSTRLEN];
+  char path[121], line[256], buf[256], identstr[256];
   int prevtime, servidx;
   sockname_t addr;
+#ifdef IPV6
+  char s[INET6_ADDRSTRLEN];
+#else
+  char s[INET_ADDRSTRLEN];
+#endif
 
   snprintf(identstr, sizeof identstr, "### eggdrop_%s", pid_file);
 
