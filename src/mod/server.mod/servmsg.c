@@ -1953,6 +1953,18 @@ static void server_resolve_success(int servidx)
     return;
   }
   /* Setup ident with server values populated */
+
+
+  sockname_t addrx;
+  char sx[INET6_ADDRSTRLEN];
+  getsockname(dcc[servidx].sock, &addrx.addr.sa, &addrx.addrlen);
+  inet_ntop(AF_INET6, &(addrx.addr.s6.sin6_addr), sx, INET6_ADDRSTRLEN);
+  printf("1 idx     = %i\n", servidx);
+  printf("1 sock    = %li\n", dcc[servidx].sock);
+  printf("1 ip      = %s\n", sx);
+  printf("1 port is = %i\n", ntohs(addrx.addr.s6.sin6_port));
+
+
   check_tcl_event("ident");
 #ifdef TLS
   if (dcc[servidx].ssl && ssl_handshake(serv, TLS_CONNECT, tls_vfyserver,

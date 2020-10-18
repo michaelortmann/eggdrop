@@ -166,6 +166,18 @@ static void ident_oidentd()
     putlog(LOG_MISC, "*", "IDENT: Error opening oident.conf for reading");
   }
   servidx = findanyidx(serv);
+
+
+sockname_t addrx;
+char sx[INET6_ADDRSTRLEN];
+getsockname(dcc[servidx].sock, &addrx.addr.sa, &addrx.addrlen);
+inet_ntop(AF_INET6, &(addrx.addr.s6.sin6_addr), sx, INET6_ADDRSTRLEN);
+printf("2 idx     = %i\n", servidx);
+printf("2 sock    = %li\n", dcc[servidx].sock);
+printf("2 ip      = %s\n", sx);
+printf("2 port is = %i\n", ntohs(addrx.addr.s6.sin6_port));
+
+
   addr.addrlen = sizeof addr.addr.sa;
   int ret = getsockname(dcc[servidx].sock, &addr.addr.sa, &addr.addrlen);
   if (ret) {
@@ -242,6 +254,17 @@ static void ident_builtin_off()
 
 static void ident_ident()
 {
+
+
+/* IF YOU remove thge comment / enable this code, then the getsockname() in ident_oidentd() returns the wright ipv6 */
+/*
+int servidx = findanyidx(serv);
+sockname_t addrx;
+char sx[INET6_ADDRSTRLEN];
+getsockname(dcc[servidx].sock, &addrx.addr.sa, &addrx.addrlen);
+*/
+
+
   if (ident_method == IDENT_METHOD_OIDENT)
     ident_oidentd();
   else if (ident_method == IDENT_METHOD_BUILTIN)
