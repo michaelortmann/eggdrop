@@ -5,7 +5,6 @@
  * Copyright (c) 2021 Michael Ortmann
  */
 
-use std::mem::transmute;
 use std::os::raw::{c_char, c_int, c_void};
 use std::ptr;
 
@@ -19,7 +18,7 @@ pub struct global_funcs {
     egg_context: extern "C" fn(),
     module_rename: extern "C" fn(),
     /* 4 - 7 */
-    module_register: extern "C" fn(*const c_char, &[Option<extern "C" fn()>; 4], c_int, c_int),
+    module_register: extern "C" fn(*const c_char, &[*const isize; 4], c_int, c_int),
     module_find: extern "C" fn(),
     module_depend: extern "C" fn(),
     module_undepend: extern "C" fn(*mut c_char) -> c_int,
@@ -40,11 +39,11 @@ pub extern "C" fn rust_close() -> *const c_char {
 pub extern "C" fn rust_start(global: &global_funcs) -> *const c_char {
 
     //#[repr(C)]
-    const RUST_TABLE: [Option<extern "C" fn()>; 4] = [
-        Some(unsafe { transmute(rust_start as extern "C" fn(_) -> _) }),
-        Some(unsafe { transmute(rust_close as extern "C" fn() -> _) }),
-        None,
-        None];
+    const RUST_TABLE: [*const isize; 4] = [
+        rust_start as *const isize,
+        rust_close as *const isize,
+        ptr::null(),
+        ptr::null()];
 
     (global.module_register)(MODULE_NAME.as_ptr() as *const c_char, &RUST_TABLE, 0, 1);
     println!("hello from rust.mod rust_start()");
