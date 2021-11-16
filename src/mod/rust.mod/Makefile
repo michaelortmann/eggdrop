@@ -11,7 +11,7 @@ modules: rust.$(MOD_EXT)
 # 	rustc --emit=obj rust.rs
 
 rust.$(MOD_EXT):
-	rustc --crate-type cdylib rust.rs -o rust.$(MOD_EXT)
+	rustc --crate-type cdylib -g rust.rs -o rust.$(MOD_EXT)
 
 clean:
 	@rm -f *.$(MOD_EXT)
