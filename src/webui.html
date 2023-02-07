@@ -1,0 +1,44 @@
+<!--
+SPDX-License-Identifier: GPL-2.0-only
+
+webui.html
+
+Written by Michael Ortmann
+
+Copyright (C) 2023 Eggheads Development Team
+-->
+<!DOCTYPE html>
+<head>
+  <title>
+    Eggdrop
+  </title>
+</head>
+<body bgcolor="#000000" text="#00ff00">
+  <center>
+    Eggdrop<br>
+    Sign In<br>
+    <span id="a">Handle: </span><input id="d" type="text" class="b" onkeydown="b(this)" size="32" autofocus/>
+  </center>
+  <script>
+    var ws;
+    function b(c) {
+      if(event.key === 'Enter') {
+        if (typeof ws === 'undefined') {
+          ws = new WebSocket("wss://127.0.0.1:8080/w");
+          ws.onopen = function() {
+            ws.send(c.value);
+            // document.getElementById('a');
+            a.textContent = "Password: ";
+            c.value = "";
+          }
+        }
+        else {
+          ws.send(c.value);
+          let pn = a.parentNode;
+          pn.removeChild(a);
+          pn.removeChild(d);
+        }
+      }
+    }
+  </script>
+</body>

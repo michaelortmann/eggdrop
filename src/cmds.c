@@ -39,7 +39,8 @@ extern unsigned long otraffic_irc, otraffic_irc_today, itraffic_irc,
                      itraffic_bn, itraffic_bn_today, otraffic_dcc,
                      otraffic_dcc_today, itraffic_dcc, itraffic_dcc_today,
                      otraffic_trans, otraffic_trans_today, itraffic_trans,
-                     itraffic_trans_today, otraffic_unknown,
+                     itraffic_trans_today, otraffic_webui, otraffic_webui_today,
+                     itraffic_webui, itraffic_webui_today, otraffic_unknown,
                      otraffic_unknown_today, itraffic_unknown,
                      itraffic_unknown_today;
 extern Tcl_Interp *interp;
@@ -3253,6 +3254,14 @@ static void cmd_traffic(struct userrec *u, int idx, char *par)
     dprintf(idx, "   in: %s", btos(itraffic_trans + itraffic_trans_today));
     dprintf(idx, " (%s today)\n", btos(itraffic_trans_today));
   }
+  if (otraffic_webui > 0 || itraffic_webui > 0 || otraffic_webui_today > 0 ||
+      itraffic_webui_today > 0) {
+    dprintf(idx, "WEBUI:\n");
+    dprintf(idx, "  out: %s", btos(otraffic_webui + otraffic_webui_today));
+    dprintf(idx, " (%s today)\n", btos(otraffic_webui_today));
+    dprintf(idx, "   in: %s", btos(itraffic_webui + itraffic_webui_today));
+    dprintf(idx, " (%s today)\n", btos(itraffic_webui_today));
+  }
   if (otraffic_unknown > 0 || otraffic_unknown_today > 0) {
     dprintf(idx, "Misc:\n");
     dprintf(idx, "  out: %s", btos(otraffic_unknown + otraffic_unknown_today));
@@ -3263,18 +3272,21 @@ static void cmd_traffic(struct userrec *u, int idx, char *par)
   dprintf(idx, "---\n");
   dprintf(idx, "Total:\n");
   itmp = otraffic_irc + otraffic_bn + otraffic_dcc + otraffic_trans +
-         otraffic_unknown + otraffic_irc_today + otraffic_bn_today +
-         otraffic_dcc_today + otraffic_trans_today + otraffic_unknown_today;
+         otraffic_webui + otraffic_unknown + otraffic_irc_today +
+         otraffic_bn_today + otraffic_dcc_today + otraffic_trans_today +
+         otraffic_webui_today + otraffic_unknown_today;
   itmp2 = otraffic_irc_today + otraffic_bn_today + otraffic_dcc_today +
-          otraffic_trans_today + otraffic_unknown_today;
+          otraffic_trans_today + otraffic_webui_today + otraffic_unknown_today;
   dprintf(idx, "  out: %s", btos(itmp));
   dprintf(idx, " (%s today)\n", btos(itmp2));
   dprintf(idx, "   in: %s", btos(itraffic_irc + itraffic_bn + itraffic_dcc +
-          itraffic_trans + itraffic_unknown + itraffic_irc_today +
-          itraffic_bn_today + itraffic_dcc_today + itraffic_trans_today +
+          itraffic_trans + itraffic_webui + itraffic_unknown +
+          itraffic_irc_today + itraffic_bn_today + itraffic_dcc_today +
+          itraffic_trans_today + itraffic_webui_today +
           itraffic_unknown_today));
   dprintf(idx, " (%s today)\n", btos(itraffic_irc_today + itraffic_bn_today +
-          itraffic_dcc_today + itraffic_trans_today + itraffic_unknown_today));
+          itraffic_dcc_today + itraffic_trans_today + itraffic_webui_today +
+          itraffic_unknown_today));
   putlog(LOG_CMDS, "*", "#%s# traffic", dcc[idx].nick);
 }
 

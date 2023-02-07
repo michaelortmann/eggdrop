@@ -52,7 +52,7 @@ extern struct dcc_t *dcc;
 extern int backgrd, use_stderr, resolve_timeout, dcc_total;
 extern unsigned long otraffic_irc_today, otraffic_bn_today, otraffic_dcc_today,
                      otraffic_filesys_today, otraffic_trans_today,
-                     otraffic_unknown_today;
+                     otraffic_webui_today, otraffic_unknown_today;
 extern time_t online_since;
 
 char nat_ip[INET_ADDRSTRLEN] = ""; /* Public IPv4 to report for systems behind NAT */
@@ -1305,8 +1305,11 @@ void tputs(int z, char *s, unsigned int len)
             otraffic_trans_today += len;
           else if (!strncmp(dcc[idx].type->name, "GET", 3))
             otraffic_trans_today += len;
-          else
+          else if (!strcmp(dcc[idx].type->name, "WEBUI"))
+            otraffic_webui_today += len;
+          else {
             otraffic_unknown_today += len;
+          }
           break;
         }
       }

@@ -157,6 +157,8 @@ unsigned long otraffic_filesys = 0;
 unsigned long otraffic_filesys_today = 0;
 unsigned long otraffic_trans = 0;
 unsigned long otraffic_trans_today = 0;
+unsigned long otraffic_webui = 0;
+unsigned long otraffic_webui_today = 0;
 unsigned long otraffic_unknown = 0;
 unsigned long otraffic_unknown_today = 0;
 unsigned long itraffic_irc = 0;
@@ -167,6 +169,8 @@ unsigned long itraffic_dcc = 0;
 unsigned long itraffic_dcc_today = 0;
 unsigned long itraffic_trans = 0;
 unsigned long itraffic_trans_today = 0;
+unsigned long itraffic_webui = 0;
+unsigned long itraffic_webui_today = 0;
 unsigned long itraffic_unknown = 0;
 unsigned long itraffic_unknown_today = 0;
 
@@ -176,10 +180,6 @@ char cx_file[16][32];
 char cx_note[16][256];
 int cx_line[16];
 int cx_ptr = 0;
-#endif
-
-#ifdef TLS
-int ssl_cleanup();
 #endif
 
 void fatal(const char *s, int recoverable)
@@ -757,11 +757,20 @@ static void event_resettraffic()
   itraffic_unknown += itraffic_unknown_today;
   otraffic_trans += otraffic_trans_today;
   itraffic_trans += itraffic_trans_today;
-  otraffic_irc_today = otraffic_bn_today = 0;
-  otraffic_dcc_today = otraffic_unknown_today = 0;
-  itraffic_irc_today = itraffic_bn_today = 0;
-  itraffic_dcc_today = itraffic_unknown_today = 0;
-  itraffic_trans_today = otraffic_trans_today = 0;
+  otraffic_webui += otraffic_webui_today;
+  itraffic_webui += itraffic_webui_today;
+  otraffic_irc_today = 0;
+  otraffic_bn_today = 0;
+  otraffic_dcc_today = 0;
+  otraffic_unknown_today = 0;
+  otraffic_trans_today = 0;
+  otraffic_webui_today = 0;
+  itraffic_irc_today = 0;
+  itraffic_bn_today = 0;
+  itraffic_dcc_today = 0;
+  itraffic_unknown_today = 0;
+  itraffic_trans_today = 0;
+  itraffic_webui_today = 0;
 }
 
 static void event_loaded()
@@ -852,6 +861,8 @@ static void mainloop(int toplevel)
               itraffic_trans_today += strlen(buf) + 1;
             else if (!strncmp(dcc[idx].type->name, "GET", 3))
               itraffic_trans_today += strlen(buf) + 1;
+            else if (!strcmp(dcc[idx].type->name, "WEBUI"))
+              itraffic_webui_today += strlen(buf) + 1;
             else
               itraffic_unknown_today += strlen(buf) + 1;
           }

@@ -21,7 +21,7 @@ LDFLAGS = @LDFLAGS@
 eggdrop_objs = bg.o botcmd.o botmsg.o botnet.o chanprog.o cmds.o dcc.o \
 dccutil.o dns.o flags.o language.o match.o main.o mem.o misc.o misc_file.o \
 modules.o net.o rfc1459.o tcl.o tcldcc.o tclhash.o tclmisc.o tcluser.o \
-tls.o userent.o userrec.o users.o
+tls.o userent.o userrec.o users.o webui.o
 
 MAKE_GENERIC_ARGS = 'MAKE=$(MAKE)' 'CC=$(CC)' 'LD=$(LD)' \
                     'STRIP=$(STRIP)' 'CFLGS=$(CFLGS)'
@@ -123,7 +123,7 @@ dcc.o: dcc.c main.h ../config.h ../eggint.h ../lush.h lang.h eggdrop.h \
  chan.h users.h compat/compat.h compat/base64.h compat/inet_aton.h \
  ../src/main.h compat/snprintf.h compat/gethostbyname2.h \
  compat/explicit_bzero.h compat/strlcpy.h modules.h mod/modvals.h \
- tandem.h md5/md5.h
+ tandem.h webui.h md5/md5.h
 dccutil.o: dccutil.c main.h ../config.h ../eggint.h ../lush.h lang.h \
  eggdrop.h compat/in6.h flags.h proto.h misc_file.h cmdt.h tclegg.h \
  tclhash.h chan.h users.h compat/compat.h compat/base64.h \
@@ -238,3 +238,4 @@ users.o: users.c main.h ../config.h ../eggint.h ../lush.h lang.h \
  compat/inet_aton.h ../src/main.h compat/snprintf.h \
  compat/gethostbyname2.h compat/explicit_bzero.h compat/strlcpy.h \
  modules.h mod/modvals.h tandem.h
+webui.o: webui.c
