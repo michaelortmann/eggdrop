@@ -22,9 +22,9 @@ Copyright (C) 2023 Eggheads Development Team
   <script>
     var ws;
     function b(c) {
-      if(event.key === 'Enter') {
-        if (typeof ws === 'undefined') {
-          ws = new WebSocket("wss://127.0.0.1:8080/w");
+      if(event.key === "Enter") {
+        if (typeof ws === "undefined") {
+          ws = new WebSocket("%");
           ws.onopen = function() {
             ws.send(c.value);
             // document.getElementById('a');

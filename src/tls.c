@@ -935,15 +935,11 @@ int ssl_handshake(int sock, int flags, int verify, int loglevel, char *host,
     if (!ret)
       debug0("TLS: connect handshake failed.");
   } else {
-    if (data->verify & TLS_VERIFYPEER) {
-      debug1("SSL VERIFY 1 %i", data->verify);
+    if (data->verify & TLS_VERIFYPEER)
       SSL_set_verify(td->socklist[i].ssl, SSL_VERIFY_PEER |
                      SSL_VERIFY_FAIL_IF_NO_PEER_CERT, ssl_verify);
-    }
-    else {
-      debug1("SSL VERIFY 2 %i", data->verify);
+    else
       SSL_set_verify(td->socklist[i].ssl, SSL_VERIFY_PEER, ssl_verify);
-    }
     ret = SSL_accept(td->socklist[i].ssl);
     if (!ret)
       debug0("TLS: accept handshake failed");

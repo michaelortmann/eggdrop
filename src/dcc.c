@@ -27,7 +27,6 @@
 #include <errno.h>
 #include "modules.h"
 #include "tandem.h"
-#include "webui.h"
 
 /* Includes for botnet md5 challenge/response code <cybah> */
 #include "md5/md5.h"
@@ -2386,8 +2385,7 @@ static void dcc_telnet_got_ident(int i, char *host)
   /* webui? */
   if (!strcmp(dcc[idx].nick, "(webui)")) {
     /* i guess here is the latest possibility to switch over, before real telnet control would happen */
-    debug0("FINALLY SWITCHING OVER TO WEBUI DCC TYPE");
-    dcc[i].type = &DCC_WEBUI; /* better than using changeover?? */
+    dcc[i].type = &DCC_WEBUI_HTTP; /* better than using changeover?? */
     dcc[i].u.other = NULL; /* do we need this?? */
     strcpy(dcc[i].nick, "*"); /* do we need this?? maybe copy idx.host to i.nick as telnet later would do?? */
     sockoptions(dcc[i].sock, EGG_OPTION_SET, SOCK_BINARY); /* this is damn important for our web ui socket handling, we dont want to read linewise https requests and websocket is a binary protokoll anyway */

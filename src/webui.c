@@ -21,6 +21,11 @@
 #include <openssl/sha.h>
 #include "version.h"
 
+/* 0x15 = TLS ContentType alert
+ * 0x0a = TLS Alert       unexpected_message
+ */
+uint8_t alert[] = {0x15, 0x03, 0x01, 0x00, 0x02, 0x02, 0x0a};
+
 /* wget https://www.eggheads.org/favicon.ico
  * xxd -i favicon.ico
  */
@@ -158,11 +163,28 @@ static void webui_eof(int idx) {
   lostdcc(idx);
 }
 
-static void ws(int idx, char *buf, int len) {
+static void webui_ws_activity(int idx, char *buf, int len) {
+  struct rusage ru1, ru2;
+  int r, i;
   uint8_t *key, *payload;
-  int i;
 
-  debug0("webui: ws()");
+  r = getrusage(RUSAGE_SELF, &ru1);
+  debug2("webui: webui_ws_activity(): idx %i len %i", idx, len);
+  if (len < 6) { /* TODO: better len check */
+    putlog(LOG_MISC, "*",
+           "WEBUI error: %s sent something other than WebSocket protocol",
+           iptostr(&dcc[idx].sockname.addr.sa));
+    killsock(dcc[idx].sock);
+    lostdcc(idx);
+    return;
+  }
+  if (buf[0] & 0x08) {
+    debug1("webui: webui_ws_activity(): %s sent connection close",
+           iptostr(&dcc[idx].sockname.addr.sa));
+    killsock(dcc[idx].sock);
+    lostdcc(idx);
+    return;
+  }
   /* xor decrypt
    */
   key = (uint8_t *) buf;
@@ -180,16 +202,64 @@ static void ws(int idx, char *buf, int len) {
   for (i = 0; i < len; i++)
     payload[i] = payload[i] ^ key[i % 4];
   debug2("webui: content: >>>%.*s<<<", len, payload);
+  if (!r && !getrusage(RUSAGE_SELF, &ru2))
+    debug2("webui: webui_ws_activity(): user %.3fms sys %.3fms",
+           (double) (ru2.ru_utime.tv_usec - ru1.ru_utime.tv_usec) / 1000 +
+           (double) (ru2.ru_utime.tv_sec  - ru1.ru_utime.tv_sec ) * 1000,
+           (double) (ru2.ru_stime.tv_usec - ru1.ru_stime.tv_usec) / 1000 +
+           (double) (ru2.ru_stime.tv_sec  - ru1.ru_stime.tv_sec ) * 1000);
 }
 
-static void http(int idx, char *buf, int len) {
-  char response[2048]; /* > sizeof webui.html */
-  int i;
 
+static void webui_ws_display(int idx, char *buf) {
+  if (!dcc[idx].ssl)
+    strcpy(buf, "webui ws");
+  else
+    strcpy(buf, "webui wss");
+}
+
+struct dcc_table DCC_WEBUI_WS = {
+  "WEBUI_WS",
+  0,
+  webui_eof,
+  webui_ws_activity,
+  NULL,
+  NULL,
+  webui_ws_display,
+  NULL,
+  NULL,
+  NULL,
+  NULL
+};
+
+static void webui_http_activity(int idx, char *buf, int len) {
+  struct rusage ru1, ru2;
+  int r, i;
+  char url[64], response[2048]; /* > url with ipv6, > sizeof webui.html */
+
+  if (len < 6) { /* TODO: better len check */
+    putlog(LOG_MISC, "*",
+           "WEBUI error: %s sent something other than http GET request",
+           iptostr(&dcc[idx].sockname.addr.sa));
+    killsock(dcc[idx].sock);
+    lostdcc(idx);
+    return;
+  }
+  if (buf[0] == 0x16) { /* 0x16 = TLS handshake */
+      putlog(LOG_MISC, "*",
+             "WEBUI error: %s requested TLS handshake for non-ssl port",
+             iptostr(&dcc[idx].sockname.addr.sa));
+      tputs(dcc[idx].sock, (char *) alert, sizeof alert);
+      killsock(dcc[idx].sock);
+      lostdcc(idx);
+      return;
+  }
+  r = getrusage(RUSAGE_SELF, &ru1);
+  debug2("webui: webui_http_activity(): idx %i len %i", idx, len);
   buf[len] = '\0'; /* TODO: is there no better way? we already know len */
   debug0("webui: http()");
-  if (!strncmp(buf, GET_INDEX, (sizeof GET_INDEX) - 1)) {
-    debug0("webui: " GET_INDEX);
+  if (buf[5] == ' ') {
+    debug0("webui: webui: GET /");
 
     /* the html / js page was hard to maintain inline this C source,
      * so i moved it to a file
@@ -211,6 +281,7 @@ static void http(int idx, char *buf, int len) {
     char *body;
     if ((fd = open(PATH, O_RDONLY)) < 0) {
       putlog(LOG_MISC, "*", "WEBUI error: open(" PATH "): %s", strerror(errno));
+      /* TODO: lostdcc() killsock() */
       return;
     }
     if (fstat(fd, &sb) < 0) {
@@ -227,25 +298,40 @@ static void http(int idx, char *buf, int len) {
       return;
     }
 
-    /* TODO: we must replace the websocket ip with the one in use for the initial https
-     * also we have to check and take care, that the cert is good for that ip (or even host?)
-     * because i have the "feeling" that websocket connect is more picky about a good match
+    /* websocket url in webui.html must be replaced with same ip and port that
+     * the client connected via http
+     * url placeholder is %, webui.html must contain exactly one %
+     * if we want more sophisticated html/js, we have to enhance this
+     * placeholder / replacement strategy
+     */ 
+    struct sockaddr_in name;
+    socklen_t namelen = sizeof name;
+    if (getsockname(dcc[idx].sock, &name, &namelen) < 0)
+      debug2("WEBUI error(): getsockname() socket %ld error %s", dcc[idx].sock, strerror(errno));
+    int urllen = snprintf(url, sizeof url, "ws%s://%s:%i/w", dcc[idx].ssl ? "s" : "", iptostr((struct sockaddr *) &name), htons(name.sin_port));
+    /* TODO: lets check again later so we dont introduce overflows,
+     * we want sizeof resonse be dynamic, dont we?
      */
-
+    for (i = 0; i < sb.st_size; i++)
+      if (body[i] != '%')
+        response[i] = body[i];
+      else
+        break;
     i = snprintf(response, sizeof response,
       "HTTP/1.1 200 \r\n" /* textual phrase is OPTIONAL */
       //"Connection: close\r\n" // or keep-alive, gross/kleinschreibung scheint egal
       "Content-Length: %li\r\n"
       "Server: Eggdrop/%s+%s\r\n"
-      "\r\n%.*s", sb.st_size, EGG_STRINGVER, EGG_PATCH, (int) sb.st_size, body);
+      "\r\n%.*s%s%.*s", sb.st_size - 1 + urllen, EGG_STRINGVER, EGG_PATCH, i, body, url, (int) (sb.st_size - i - 1), body + i + 1);
+
     tputs(dcc[idx].sock, response, i);
     debug2("webui: tputs(): >>>%s<<< %i", response, i);
     if (munmap(body, sb.st_size) < 0) {
       putlog(LOG_MISC, "*", "WEBUI error: munmap(): %s", strerror(errno));
       return;
     }
-  } else if (!strncmp(buf, GET_FAVICON, (sizeof GET_FAVICON) - 1)) {
-    debug0("webui: " GET_FAVICON);
+  } else if (buf[5] == 'f') {
+    debug0("webui: GET /favicon.ico");
     i = snprintf(response, sizeof response,
       "HTTP/1.1 200 \r\n" /* textual phrase is OPTIONAL */
       //"Connection: close\r\n" // or keep-alive, gross kleinschreibung wahrscheinlich egal */
@@ -259,8 +345,8 @@ static void http(int idx, char *buf, int len) {
 
     tputs(dcc[idx].sock, response, i);
     debug1("webui: tputs(): %i", i);
-  } else if (!strncmp(buf, GET_W, (sizeof GET_W) - 1)) {
-    debug0("webui: " GET_W);
+  } else if (buf[5] == 'w') {
+    debug0("webui: GET /w");
     #define KEYKEY "Sec-WebSocket-Key:"
     buf = strstr(buf, KEYKEY);
     if (!buf) {
@@ -300,17 +386,9 @@ static void http(int idx, char *buf, int len) {
       "\r\n", out);
     tputs(dcc[idx].sock, response, i);
     debug2("webui: tputs(): >>>%s<<< %i", response, i);
-
-    /* TODO: after upgrading to websocket protocol, we have to set our
-     * socket/idx/dcc/whatever to a new state, so we can properly parse the
-     * websocket frames that will come in with next read
-     * in other words:
-     * instead of using .status, we could / should? use a new DCC_STRUCT for the websocket,
-     * then we also would not need that http/ws switch but have different activity funcs from the start
-     * tldr: websocket upgrade -> changeover()
-     */
-    dcc[idx].status = 1; /* websocket identifier for .dcc display */
-  }
+    changeover_dcc(idx, &DCC_WEBUI_WS, 0);
+  } else /* TODO: send 404 or something ? */
+    debug0("webui: 404");
   if (len == 511) {
     /* read probable remaining bytes */
     struct threaddata *td = threaddata();
@@ -323,49 +401,29 @@ static void http(int idx, char *buf, int len) {
         break;
       }
   }
-}
-
-static void webui_activity(int idx, char *buf, int len) {
-  struct rusage ru1, ru2;
-  int r = getrusage(RUSAGE_SELF, &ru1);
-
-  debug2("webui: webui_activity(): idx %i len %i", idx, len);
-  if ((len > 5) && /* len >= min(ws,"GET /\r\n") */
-      (*buf & 0x80)) /* hacking the protocol for fun and profit
-                      * msb 1 = ws(s)   = 0b10000001 = FIN & opcode text frame
-                      *     0 = http(s) = 0b01000111 = 'G' = "GET /" */
-    ws(idx, buf, len);
-  else
-    http(idx, buf, len);
   if (!r && !getrusage(RUSAGE_SELF, &ru2))
-    debug2("webui: webui_activity(): user %.3fms sys %.3fms",
+    debug2("webui: webui_http_activity(): user %.3fms sys %.3fms",
            (double) (ru2.ru_utime.tv_usec - ru1.ru_utime.tv_usec) / 1000 +
            (double) (ru2.ru_utime.tv_sec  - ru1.ru_utime.tv_sec ) * 1000,
            (double) (ru2.ru_stime.tv_usec - ru1.ru_stime.tv_usec) / 1000 +
            (double) (ru2.ru_stime.tv_sec  - ru1.ru_stime.tv_sec ) * 1000);
 }
 
-static void webui_display(int idx, char *buf) {
-  if (!dcc[idx].status)
-    if (!dcc[idx].ssl)
-      strcpy(buf, "webui http");
-    else
-      strcpy(buf, "webui https");
+static void webui_http_display(int idx, char *buf) {
+  if (!dcc[idx].ssl)
+    strcpy(buf, "webui http");
   else
-    if (!dcc[idx].ssl)
-      strcpy(buf, "webui ws");
-    else
-      strcpy(buf, "webui wss");
+    strcpy(buf, "webui https");
 }
 
-struct dcc_table DCC_WEBUI = {
-  "WEBUI",
+struct dcc_table DCC_WEBUI_HTTP = {
+  "WEBUI_HTTP",
   0,
   webui_eof,
-  webui_activity,
+  webui_http_activity,
   NULL,
   NULL,
-  webui_display,
+  webui_http_display,
   NULL,
   NULL,
   NULL,
