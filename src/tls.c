@@ -185,7 +185,6 @@ char *ssl_getfp(int sock)
  */
 int ssl_init()
 {
-  X509 *x509;
   /* OpenSSL library initialization
    * If you are using 1.1.0 or above then you don't need to take any further steps. */
 #if OPENSSL_VERSION_NUMBER < 0x10100000L /* 1.1.0 */
@@ -227,13 +226,10 @@ int ssl_init()
      *       print this fingerprint to every user / every partyline login
      *       maybe only print it when webui is enabled */
 
-    x509 = SSL_CTX_get0_certificate(ssl_ctx);
-    if (x509) {
-      putlog(LOG_MISC, "*", "Certificate loaded: %s (sha1 fingerprint %s)",
-             tls_certfile, ssl_getfp_from_cert(x509));
-      if (ASN1_TIME_cmp_time_t(X509_get0_notAfter(x509), time(NULL)) < 0)
-        putlog(LOG_MISC, "*", "WARNING: certificate expired: %s", tls_certfile);
-    }
+    putlog(LOG_MISC, "*", "Certificate loaded: %s (sha1 fingerprint %s)",
+           tls_certfile,
+           ssl_getfp_from_cert(SSL_CTX_get0_certificate(ssl_ctx)));
+
     if (SSL_CTX_use_PrivateKey_file(ssl_ctx, tls_keyfile, SSL_FILETYPE_PEM) != 1) {
       putlog(LOG_MISC, "*", "ERROR: TLS: unable to load private key from %s: %s",
           tls_keyfile, ERR_error_string(ERR_get_error(), NULL));

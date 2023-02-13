@@ -188,15 +188,15 @@ static void webui_ws_activity(int idx, char *buf, int len) {
   /* xor decrypt
    */
   key = (uint8_t *) buf;
-  if (key[1] == 0xfe) {
-    key += 4;
-    len -= 8;
-  } else if (key[1] == 0xff) {
-    key += 10;
-    len -= 14;
-  } else {
+  if (key[1] < 0xfe) {
     key += 2;
     len -= 6;
+  } else if (key[1] == 0xfe) {
+    key += 4;
+    len -= 8;
+  } else {
+    key += 10;
+    len -= 14;
   }
   payload = key + 4;
   for (i = 0; i < len; i++)
@@ -209,7 +209,6 @@ static void webui_ws_activity(int idx, char *buf, int len) {
            (double) (ru2.ru_stime.tv_usec - ru1.ru_stime.tv_usec) / 1000 +
            (double) (ru2.ru_stime.tv_sec  - ru1.ru_stime.tv_sec ) * 1000);
 }
-
 
 static void webui_ws_display(int idx, char *buf) {
   if (!dcc[idx].ssl)
