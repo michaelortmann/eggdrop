@@ -1360,13 +1360,6 @@ static void dcc_telnet_hostresolved(int i)
     check_tcl_listen(dcc[idx].host, dcc[i].sock);
     return;
   }
-
-  /* UPDATE: meanwhile i think we should do ident for webui
-   * lets do https and websocket after ident
-   * lets switch over right before doing special telnetr elated stuff
-   * and reuse most of telnet code
-   * the telnet code later may need some refactoring */
-
   /* Skip ident lookup if disabled */
   if (identtimeout <= 0) {
     dcc[i].u.ident_sock = dcc[idx].sock;
