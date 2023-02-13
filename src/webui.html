@@ -24,7 +24,7 @@ Copyright (C) 2023 Eggheads Development Team
     function b(c) {
       if(event.key === "Enter") {
         if (typeof ws === "undefined") {
-          ws = new WebSocket("%");
+          ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws:") + location.host + "/w");
           ws.onopen = function() {
             ws.send(c.value);
             a.textContent = "Password: ";

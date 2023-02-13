@@ -235,7 +235,7 @@ struct dcc_table DCC_WEBUI_WS = {
 static void webui_http_activity(int idx, char *buf, int len) {
   struct rusage ru1, ru2;
   int r, i;
-  char url[64], response[2048]; /* > url with ipv6, > sizeof webui.html */
+  char response[2048]; /* > sizeof webui.html */
 
   if (len < 6) { /* TODO: better len check */
     putlog(LOG_MISC, "*",
@@ -297,33 +297,12 @@ static void webui_http_activity(int idx, char *buf, int len) {
       putlog(LOG_MISC, "*", "WEBUI error: mmap(" PATH "): %s\n", strerror(errno));
       return;
     }
-
-    /* websocket url in webui.html must be replaced with same ip and port that
-     * the client connected via http
-     * url placeholder is %, webui.html must contain exactly one %
-     * if we want more sophisticated html/js, we have to enhance this
-     * placeholder / replacement strategy
-     */ 
-    struct sockaddr_in name;
-    socklen_t namelen = sizeof name;
-    if (getsockname(dcc[idx].sock, &name, &namelen) < 0)
-      debug2("WEBUI error(): getsockname() socket %ld error %s", dcc[idx].sock, strerror(errno));
-    int urllen = snprintf(url, sizeof url, "ws%s://%s:%i/w", dcc[idx].ssl ? "s" : "", iptostr((struct sockaddr *) &name), htons(name.sin_port));
-    /* TODO: lets check again later so we dont introduce overflows,
-     * we want sizeof resonse be dynamic, dont we?
-     */
-    for (i = 0; i < sb.st_size; i++)
-      if (body[i] != '%')
-        response[i] = body[i];
-      else
-        break;
     i = snprintf(response, sizeof response,
       "HTTP/1.1 200 \r\n" /* textual phrase is OPTIONAL */
       //"Connection: close\r\n" // or keep-alive, gross/kleinschreibung scheint egal
       "Content-Length: %li\r\n"
       "Server: Eggdrop/%s+%s\r\n"
-      "\r\n%.*s%s%.*s", sb.st_size - 1 + urllen, EGG_STRINGVER, EGG_PATCH, i, body, url, (int) (sb.st_size - i - 1), body + i + 1);
-
+      "\r\n%.*s", sb.st_size, EGG_STRINGVER, EGG_PATCH, (int) sb.st_size, body);
     tputs(dcc[idx].sock, response, i);
     debug2("webui: tputs(): >>>%s<<< %i", response, i);
     if (munmap(body, sb.st_size) < 0) {
