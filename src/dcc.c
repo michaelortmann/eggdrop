@@ -1297,10 +1297,71 @@ static void dcc_telnet(int idx, char *buf, int i)
   dcc_dnshostbyip(&dcc[i].sockname);
 }
 
+/* wir benoetigt, da dcc_telnet_hostresolved() nach webui DCC_TABLE umleiten kann und dann am ende aber wieder hier wietermachen muss */
+void dcc_telnet_hostresolved2(int i, int idx) {
+  int j, sock;
+  char *userhost = dcc[idx].host; /* host zurueck nach userhost und wieder zurueck scheint irgendwie doppeltgemoppelt */
+  /* Skip ident lookup if disabled */
+  if (identtimeout <= 0) {
+    dcc[i].u.ident_sock = dcc[idx].sock;
+    dcc_telnet_got_ident(i, userhost);
+    return;
+  }
+
+  debug2("##### %i %i", i, idx);
+  debug2("##### %s %s", dcc[i].type->name, dcc[idx].type->name);
+  debug2("##### %s %s", dcc[i].nick, dcc[idx].nick);
+  debug2("##### %s %s", dcc[i].host, dcc[idx].host);
+  tell_dcc(3);
+  //fatal("blabli", 1);
+
+
+  changeover_dcc(i, &DCC_IDENTWAIT, 0);
+  dcc[i].timeval = now;
+  dcc[i].u.ident_sock = dcc[idx].sock;
+  sock = -1;
+  j = new_dcc(&DCC_IDENT, 0);
+  if (j < 0)
+    putlog(LOG_MISC, "*", DCC_IDENTFAIL, dcc[i].host, strerror(errno));
+  else {
+    memcpy(&dcc[j].sockname, &dcc[i].sockname, sizeof(sockname_t));
+    dcc[j].sock = getsock(dcc[j].sockname.family, 0);
+    if (dcc[j].sock >= 0) {
+      sockname_t name;
+      name.addrlen = sizeof(name.addr);
+      if (getsockname(dcc[i].sock, &name.addr.sa, &name.addrlen) < 0)
+        debug2("dcc: dcc_telnet_hostresolved(): getsockname() socket %ld error %s", dcc[i].sock, strerror(errno));
+      setsnport(name, 0);
+      if (bind(dcc[j].sock, &name.addr.sa, name.addrlen) < 0)
+        debug2("dcc: dcc_telnet_hostresolved(): bind() socket %ld error %s", dcc[j].sock, strerror(errno));
+      setsnport(dcc[j].sockname, 113);
+      if (connect(dcc[j].sock, &dcc[j].sockname.addr.sa,
+          dcc[j].sockname.addrlen) < 0 && (errno != EINPROGRESS)) {
+        killsock(dcc[j].sock);
+        lostdcc(j);
+        putlog(LOG_MISC, "*", DCC_IDENTFAIL, dcc[i].host, strerror(errno));
+        j = 0;
+      }
+      sock = dcc[j].sock;
+    }
+  }
+  if (j < 0) {
+    dcc_telnet_got_ident(i, userhost);
+    return;
+  }
+  dcc[j].sock = sock;
+  dcc[j].port = 113;
+  dcc[j].addr = dcc[i].addr;
+  strcpy(dcc[j].host, dcc[i].host);
+  strcpy(dcc[j].nick, "*");
+  dcc[j].u.ident_sock = dcc[i].sock;
+  dcc[j].timeval = now;
+  dprintf(j, "%d, %d\n", dcc[i].port, dcc[idx].port);
+}
+
 static void dcc_telnet_hostresolved(int i)
 {
   int idx;
-  int j = 0, sock;
   char s[sizeof lasttelnethost], *userhost;
 
   strlcpy(dcc[i].host, dcc[i].u.dns->host, UHOSTLEN);
@@ -1360,55 +1421,28 @@ static void dcc_telnet_hostresolved(int i)
     check_tcl_listen(dcc[idx].host, dcc[i].sock);
     return;
   }
-  /* Skip ident lookup if disabled */
-  if (identtimeout <= 0) {
-    dcc[i].u.ident_sock = dcc[idx].sock;
-    dcc_telnet_got_ident(i, userhost);
-    return;
-  }
 
-  changeover_dcc(i, &DCC_IDENTWAIT, 0);
-  dcc[i].timeval = now;
-  dcc[i].u.ident_sock = dcc[idx].sock;
-  sock = -1;
-  j = new_dcc(&DCC_IDENT, 0);
-  if (j < 0)
-    putlog(LOG_MISC, "*", DCC_IDENTFAIL, dcc[i].host, strerror(errno));
-  else {
-    memcpy(&dcc[j].sockname, &dcc[i].sockname, sizeof(sockname_t));
-    dcc[j].sock = getsock(dcc[j].sockname.family, 0);
-    if (dcc[j].sock >= 0) {
-      sockname_t name;
-      name.addrlen = sizeof(name.addr);
-      if (getsockname(dcc[i].sock, &name.addr.sa, &name.addrlen) < 0)
-        debug2("dcc: dcc_telnet_hostresolved(): getsockname() socket %ld error %s", dcc[i].sock, strerror(errno));
-      setsnport(name, 0);
-      if (bind(dcc[j].sock, &name.addr.sa, name.addrlen) < 0)
-        debug2("dcc: dcc_telnet_hostresolved(): bind() socket %ld error %s", dcc[j].sock, strerror(errno));
-      setsnport(dcc[j].sockname, 113);
-      if (connect(dcc[j].sock, &dcc[j].sockname.addr.sa,
-          dcc[j].sockname.addrlen) < 0 && (errno != EINPROGRESS)) {
-        killsock(dcc[j].sock);
-        lostdcc(j);
-        putlog(LOG_MISC, "*", DCC_IDENTFAIL, dcc[i].host, strerror(errno));
-        j = 0;
-      }
-      sock = dcc[j].sock;
-    }
-  }
-  if (j < 0) {
-    dcc_telnet_got_ident(i, userhost);
+  /* Skip ident lookup for webui http */
+  debug3("%i %s %s", LSTN_PUBLIC, dcc[idx].nick, dcc[idx].type->name);
+  if (!strcmp(dcc[idx].nick, "(webui)")) {
+    debug1("dcc_telnet_hostresolved(): %s -> DCC_WEBUI_HTTP -> skip DCC_IDENTWAIT", dcc[idx].type->name);
+    debug2("##### %i %i", i, idx);
+    debug2("##### %s %s", dcc[i].type->name, dcc[idx].type->name);
+    debug2("##### %s %s", dcc[i].nick, dcc[idx].nick);
+    debug2("##### %s %s", dcc[i].host, dcc[idx].host);
+    tell_dcc(3);
+    changeover_dcc(i, &DCC_WEBUI_HTTP, 0);
+    sockoptions(dcc[i].sock, EGG_OPTION_SET, SOCK_BINARY);
+    //dcc[i].u.other = NULL;
+    //strcpy(dcc[i].nick, "*");
+    //strlcpy(dcc[i].host, userhost, UHOSTLEN);
     return;
   }
-  dcc[j].sock = sock;
-  dcc[j].port = 113;
-  dcc[j].addr = dcc[i].addr;
-  strcpy(dcc[j].host, dcc[i].host);
-  strcpy(dcc[j].nick, "*");
-  dcc[j].u.ident_sock = dcc[i].sock;
-  dcc[j].timeval = now;
-  dprintf(j, "%d, %d\n", dcc[i].port, dcc[idx].port);
+  strlcpy(dcc[i].host, userhost, UHOSTLEN);
+  dcc_telnet_hostresolved2(i, idx);
 }
+
+
 
 static void eof_dcc_telnet(int idx)
 {
@@ -2318,28 +2352,14 @@ struct dcc_table DCC_IDENT = {
   NULL
 };
 
-void change_to_dcc_telnet_id(int idx, int i)
+static void change_to_dcc_telnet_id(int i) /* i ist der neue idx, ganz so, wie vorher in der funktion drunter, kann gerne spaeter in idx umbenannt werden */
 {
   printf("WEBUI DEBUG change_to_dcc_telnet_id()\n");
+  printf("??? %s %s %s\n", dcc[i].type->name, dcc[i].nick, dcc[i].host);
   dcc[i].type = &DCC_TELNET_ID;
   dcc[i].u.chat = get_data_ptr(sizeof(struct chat_info));
   egg_bzero(dcc[i].u.chat, sizeof(struct chat_info));
 
-  /* Note: we don't really care about telnet status here. We use the
-   * STATUS option as a hopefully harmless way to detect if the other
-   * side is a telnet client or not. */
-#ifdef TLS
-  if (!dcc[i].ssl)
-    dprintf(i, TLN_IAC_C TLN_WILL_C TLN_STATUS_C);
-#endif
-  /* Copy acceptable-nick/host mask */
-  dcc[i].status = STAT_TELNET | STAT_ECHO;
-  if (!strcmp(dcc[idx].nick, "(bots)"))
-    dcc[i].status |= STAT_BOTONLY;
-  if (!strcmp(dcc[idx].nick, "(users)") || !strcmp(dcc[idx].nick, "(webui)"))
-    dcc[i].status |= STAT_USRONLY;
-  /* Copy acceptable-nick/host mask */
-  strlcpy(dcc[i].nick, dcc[idx].host, HANDLEN);
   dcc[i].timeval = now;
   strcpy(dcc[i].u.chat->con_chan, chanset ? chanset->dname : "*");
   /* Displays a customizable banner. */
@@ -2382,6 +2402,7 @@ static void dcc_telnet_got_ident(int i, char *host)
   }
   strlcpy(dcc[i].host, host, UHOSTLEN);
   egg_snprintf(x, sizeof x, "-telnet!%s", dcc[i].host);
+
   if (protect_telnet && !make_userfile) {
     struct userrec *u;
     int ok = 1;
@@ -2422,18 +2443,37 @@ static void dcc_telnet_got_ident(int i, char *host)
   /* Do not buffer data anymore. All received and stored data is passed
    * over to the dcc functions from now on.  */
   sockoptions(dcc[i].sock, EGG_OPTION_UNSET, SOCK_BUFFER);
-
+  printf("dcc_telnet_got_ident()\n");
+  printf("++ 1 %s %s %s %s %s %s\n", dcc[idx].type->name, dcc[idx].nick, dcc[idx].host, dcc[i].type->name, dcc[i].nick, dcc[i].host);
 #ifdef TLS
   /* webui? */
-  if (!strcmp(dcc[idx].nick, "(webui)")) {
+//if (!strcmp(dcc[idx].nick, "(webui)")) {
     /* i guess here is the latest possibility to switch over, before real telnet control would happen */
-    dcc[i].type = &DCC_WEBUI_HTTP; /* better than using changeover?? */
-    dcc[i].u.other = NULL; /* do we need this?? */
-    strcpy(dcc[i].nick, "*"); /* do we need this?? maybe copy idx.host to i.nick as telnet later would do?? */
-    sockoptions(dcc[i].sock, EGG_OPTION_SET, SOCK_BINARY); /* this is damn important for our web ui socket handling, we dont want to read linewise https requests and websocket is a binary protokoll anyway */
-    return;
-  }
+//printf("???????? SOLLTE IDENTWAIT SEIN? type = %s\n", dcc[i].type->name);
+//dcc[i].type = &DCC_WEBUI_HTTP; /* better than using changeover?? */
+    //dcc[i].u.other = NULL; /* do we need this?? */ / OH NOOOOOOOOOO WE MUST NOT NULL THIS!!!! */
+    // im folgenden, NICK SOLLTE SCHON * SEIN!!!
+    //strcpy(dcc[i].nick, "*"); /* do we need this?? maybe copy idx.host to i.nick as telnet later would do?? */
+//sockoptions(dcc[i].sock, EGG_OPTION_SET, SOCK_BINARY); /* this is damn important for our web ui socket handling, we dont want to read linewise https requests and websocket is a binary protokoll anyway */
+//return;
+//}
 #endif /* TLS */
-  else
-    change_to_dcc_telnet_id(idx, i);
+//else {
+    /* Note: we don't really care about telnet status here. We use the
+     * STATUS option as a hopefully harmless way to detect if the other
+     * side is a telnet client or not. */
+#ifdef TLS
+    if (!dcc[i].ssl)
+      dprintf(i, TLN_IAC_C TLN_WILL_C TLN_STATUS_C);
+#endif
+    /* Copy acceptable-nick/host mask */
+    dcc[i].status = STAT_TELNET | STAT_ECHO;
+    if (!strcmp(dcc[idx].nick, "(users)"))
+      dcc[i].status |= STAT_USRONLY;
+    else if (!strcmp(dcc[idx].nick, "(bots)"))
+      dcc[i].status |= STAT_BOTONLY;
+    /* Copy acceptable-nick/host mask */
+    strlcpy(dcc[i].nick, dcc[idx].host, HANDLEN); /* wo ist hier der sinn? dcc[idx].host ist immer *, oder? */
+    change_to_dcc_telnet_id(i);
+//}
 }

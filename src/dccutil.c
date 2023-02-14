@@ -434,6 +434,7 @@ void tell_dcc(int zidx)
 #else
               ' ', dcc[i].port, dcc[i].nick, other);
 #endif
+    dprintf(zidx, "  %i %s\n", i, dcc[i].type->name);
   }
 }
 

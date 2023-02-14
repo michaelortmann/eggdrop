@@ -134,7 +134,7 @@ int check_ansi(char *);
 void dupwait_notify(char *);
 #ifdef TLS
 int dcc_fingerprint(int);
-void change_to_dcc_telnet_id(int, int);
+void dcc_telnet_hostresolved2(int, int);
 #endif
 
 /* dccutil.c */

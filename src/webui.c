@@ -160,7 +160,9 @@ extern struct dcc_t *dcc;
 
 void webui_frame(char **buf, unsigned int *len) {
   static uint8_t out[2048];
-  debug1("webui: webui_frame() len %u", *len);
+  /* KEIN debug() hier, sonst rekursion ?! */
+  printf("webui: webui_frame() len %u\n", *len);
+  printf("  >>%s<<\n", *buf);
   out[0] = 0x81; /* FIN + text frame */
   /* A server MUST NOT mask any frames that it sends to the client. */
   out[1] = *len;
@@ -392,7 +394,20 @@ static void webui_http_activity(int idx, char *buf, int len)
         break;
       }
     //changeover_dcc(idx, &DCC_WEBUI_WS, 0);
-    change_to_dcc_telnet_id(idx, idx); /* TODO: i stat  idx ?! */
+    dcc[idx].status |= STAT_USRONLY; /* magick */
+    tell_dcc(3);
+    //change_to_dcc_telnet_id(idx);
+    //fatal("test", 3);
+    extern int dcc_total;
+    for (i = 0; i < dcc_total; i++) /* quick hack, we need to link from idx, dont we? */
+      if (!strcmp(dcc[i].nick, "(webui)")) {
+        printf("FOUND !!}n");
+        break;
+      }
+    dcc[idx].u.other = NULL; /* fix ATTEMPTING TO FREE NON-MALLOC'D PTR: dccutil.c (561) */
+    dcc_telnet_hostresolved2(idx, i);
+    //fatal("test", 4);
+
     printf("CHANGEOVER -> idx %i sock %li\n", idx, dcc[idx].sock);
   } else /* TODO: send 404 or something ? */
     debug0("webui: 404");
