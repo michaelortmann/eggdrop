@@ -1538,12 +1538,15 @@ static void dcc_telnet_id(int idx, char *buf, int atr)
   struct flag_record fr = { FR_GLOBAL | FR_CHAN | FR_ANYWH, 0, 0, 0, 0, 0 };
   struct dcc_table *old = dcc[idx].type;
 
+  debug3("webui debug: dcc_telnet_id() 1: >>%s<< %i %i", buf, idx, atr);
   if (detect_telnet((unsigned char *) buf)) {
     dcc[idx].status |= STAT_TELNET;
     strip_telnet(dcc[idx].sock, buf, &atr);
   } else
     dcc[idx].status &= ~STAT_TELNET;
   buf[HANDLEN] = 0;
+  debug5("webui debug: dcc_telnet_id() 2: >>%s<< %i %i %s %i", buf, idx, atr, dcc[idx].nick, wild_match(dcc[idx].nick, buf));
+  debug1("idx: %i", idx);
   /* Toss out bad nicknames */
   if (dcc[idx].nick[0] != '@' && !wild_match(dcc[idx].nick, buf)) {
     dprintf(idx, "Sorry, that handle format is invalid.\n");

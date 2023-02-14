@@ -365,6 +365,8 @@ int _rfc_toupper(int);
 int _rfc_tolower(int);
 
 /* webui.c */
-void webui_write(char **, unsigned int *);
+/* TODO: size_t ? */
+void webui_frame(char **, unsigned int *);
+void webui_unframe(char **, int *);
 
 #endif /* _EGG_PROTO_H */

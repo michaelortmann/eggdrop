@@ -958,8 +958,7 @@ int sockread(char *s, int *len, sock_list *slist, int slistmax, int tclonly)
       else
 #ifdef TLS
       {
-        if (socklist[i].flags & SOCK_WS)
-          printf("net: websocket read() sock %i\n", socklist[i].sock);
+
         if (slist[i].ssl) {
           x = SSL_read(slist[i].ssl, s, grab);
           if (x < 0) {
@@ -996,8 +995,14 @@ int sockread(char *s, int *len, sock_list *slist, int slistmax, int tclonly)
           continue;           /* EAGAIN */
         }
       }
+      if (socklist[i].flags & SOCK_WS)
+      {
+        printf("net: read SOCK_WS %i\n", socklist[i].sock);
+        webui_unframe(&s, &x);
+      }
       s[x] = 0;
       *len = x;
+      debug2("webui debug: WE DID READ -> >>%s<< %i", s, *len);
       if (slist[i].flags & SOCK_PROXYWAIT) {
         debug2("net: socket: %d proxy errno: %d", slist[i].sock, s[1]);
         slist[i].flags &= ~(SOCK_CONNECT | SOCK_PROXYWAIT);
@@ -1163,6 +1168,7 @@ int sockgets(char *s, int *len)
     s[0] = 0;
     return ret;
   }
+  debug4("sockread return %i >>%s<< %i binary? %i", ret, xx, *len, socklist[ret].flags & SOCK_BINARY);
   /* sockread can return binary data while socket still has connectflag, process first */
   if (socklist[ret].flags & SOCK_BINARY && *len > 0) {
     socklist[ret].flags &= ~SOCK_CONNECT;
@@ -1326,12 +1332,12 @@ void tputs(int z, char *s, unsigned int len)
       }
 #ifdef TLS
       if (socklist[i].flags & SOCK_WS) {
-        printf("net: websocket write() sock %i\n", socklist[i].sock);
+        printf("net: write SOCK_WS %i\n", socklist[i].sock);
         //printf("VORHER: >>%s<< %i\n", s, len);
-        webui_write(&s, &len);
+        webui_frame(&s, &len);
         //for (int kk = 0; kk < len; kk++)
         //  printf("%02x ", (uint8_t) s[kk]);
-        printf("\n");
+        //printf("\n");
       }
       if (socklist[i].ssl) {
         x = SSL_write(socklist[i].ssl, s, len);

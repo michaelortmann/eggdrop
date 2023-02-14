@@ -158,67 +158,78 @@ unsigned char favicon_ico[] = {
 extern struct dcc_t *dcc;
 
 
-void webui_write(char **buf, unsigned int *len) {
+void webui_frame(char **buf, unsigned int *len) {
   static uint8_t out[2048];
-  debug1("webui: webui_write() len %i", *len);
+  debug1("webui: webui_frame() len %u", *len);
   out[0] = 0x81; /* FIN + text frame */
   /* A server MUST NOT mask any frames that it sends to the client. */
   out[1] = *len;
   /* TODO: we could offset the initial buffer and get rid of one memmove */
-  memmove(out + 2, *buf, *len);
+  memmove(out + 2, *buf, *len); /* TODO: if not in place, memcpy() would do instead of memmove() */
   *buf = (char *) out;
   *len = *len + 2;
   printf("\n");
 }
 
-static void webui_read(int idx, char *buf, int len)
+/* TODO: return error code ? */
+void webui_unframe(char **buf, int *len)
 {
-  struct rusage ru1, ru2;
-  int r, i;
+  int i;
   uint8_t *key, *payload;
 
-  r = getrusage(RUSAGE_SELF, &ru1);
-  debug2("webui: webui_ws_activity(): idx %i len %i", idx, len);
-  if (len < 6) { /* TODO: better len check */
+  debug1("webui: webui_unframe(): len %i", *len);
+  if (*len < 6) { /* TODO: better len check */
+
+
+
+    /* TODO: return error code ? */
+    putlog(LOG_MISC, "*", "WEBUI error: someone sent something other than WebSocket protocol");
+    /*
     putlog(LOG_MISC, "*",
            "WEBUI error: %s sent something other than WebSocket protocol",
            iptostr(&dcc[idx].sockname.addr.sa));
     killsock(dcc[idx].sock);
     lostdcc(idx);
+    */
     return;
   }
-  if (buf[0] & 0x08) {
+  if (*buf[0] & 0x08) {
+    putlog(LOG_MISC, "*", "webui: webui_ws_activity(): sent connection close -- UNHANDLED CURRENTLY");
+    /*
     debug1("webui: webui_ws_activity(): %s sent connection close",
            iptostr(&dcc[idx].sockname.addr.sa));
     killsock(dcc[idx].sock);
     lostdcc(idx);
+    */
     return;
   }
   /* xor decrypt
    */
-  key = (uint8_t *) buf;
+  key = (uint8_t *) *buf;
   if (key[1] < 0xfe) {
     key += 2;
-    len -= 6;
+    *len -= 6;
   } else if (key[1] == 0xfe) {
     key += 4;
-    len -= 8;
+    *len -= 8;
   } else {
     key += 10;
-    len -= 14;
+    *len -= 14;
   }
   payload = key + 4;
-  for (i = 0; i < len; i++)
+  for (i = 0; i < *len; i++)
     payload[i] = payload[i] ^ key[i % 4];
-  debug2("webui: content: >>>%.*s<<<", len, payload);
-  if (!r && !getrusage(RUSAGE_SELF, &ru2))
-    debug2("webui: webui_ws_activity(): user %.3fms sys %.3fms",
-           (double) (ru2.ru_utime.tv_usec - ru1.ru_utime.tv_usec) / 1000 +
-           (double) (ru2.ru_utime.tv_sec  - ru1.ru_utime.tv_sec ) * 1000,
-           (double) (ru2.ru_stime.tv_usec - ru1.ru_stime.tv_usec) / 1000 +
-           (double) (ru2.ru_stime.tv_sec  - ru1.ru_stime.tv_sec ) * 1000);
+  debug2("webui: content: >>>%.*s<<<", (int) *len, payload);
+
+  memmove(*buf, payload, *len);
+  /* we switched back from binary sock to text sock for sockgets() needs this for dcc_telnet_id() */
+  /* so now we have to add \r\n here :/ */
+  strcpy(*buf + *len, "\r\n");
+  *len+= 2;
+
 }
 
+/*
 static void webui_ws_display(int idx, char *buf)
 {
   if (!dcc[idx].ssl)
@@ -226,6 +237,7 @@ static void webui_ws_display(int idx, char *buf)
   else
     strcpy(buf, "webui wss");
 }
+*/
 
 static void webui_http_eof(int idx)
 {
@@ -373,12 +385,15 @@ static void webui_http_activity(int idx, char *buf, int len)
     for (i = 0; i < td->MAXSOCKS; i++)
       if (td->socklist[i].sock == dcc[idx].sock) {
         td->socklist[i].flags |= SOCK_WS;
-        printf("SOCK_WS gesetzt fuer socklist %i\n", i);
+        td->socklist[i].flags &= ~ SOCK_BINARY; /* TODO: maybe not the right place, but we need it for net.c sockgets() */
+        strcpy(dcc[idx].host, "*"); /* wichtig fuer spaeter dcc_telnet_id willd_match, aber ob das hier die richtige stelle ist, und noch was anderen fehlt?  TODO */
+        /* das .host wird in change_to_dcc_telnet_id zo .nick */
+        printf("SOCK_WS gesetzt fuer socklist %i idx %i\n", i, idx);
         break;
       }
     //changeover_dcc(idx, &DCC_WEBUI_WS, 0);
     change_to_dcc_telnet_id(idx, idx); /* TODO: i stat  idx ?! */
-    printf("CHANGEOVER -> idx %i sock %i\n", idx, dcc[idx].sock);
+    printf("CHANGEOVER -> idx %i sock %li\n", idx, dcc[idx].sock);
   } else /* TODO: send 404 or something ? */
     debug0("webui: 404");
   if (len == 511) {
