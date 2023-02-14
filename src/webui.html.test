@@ -10,22 +10,13 @@ Copyright (C) 2023 Eggheads Development Team
 <!DOCTYPE html>
 <head><title>Eggdrop</title></head>
 <body bgcolor="#000000" text="#00ff00">
-  <center>
-    Eggdrop<br>
-    Sign In<br>
-    <span id="a">Handle: </span><input id="d" type="text" class="b" onkeydown="b(this)" size="32" autofocus/>
-  </center>
+  <input id="d" type="text" class="b" onkeydown="b(this)" autofocus style="position:fixed;bottom:0;width:100%;"/> 
   <script>
     var ws;
     function b(c) {
       if(event.key === "Enter") {
         if (typeof ws === "undefined") {
           ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws:") + location.host + "/w");
-
-ws.addEventListener('message', (event) => {
-  console.log(event.data);
-});
-
           ws.onopen = function() {
             ws.send(c.value);
             a.textContent = "Password: ";

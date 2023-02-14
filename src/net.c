@@ -958,6 +958,8 @@ int sockread(char *s, int *len, sock_list *slist, int slistmax, int tclonly)
       else
 #ifdef TLS
       {
+        if (socklist[i].flags & SOCK_WS)
+          printf("net: websocket read() sock %i\n", socklist[i].sock);
         if (slist[i].ssl) {
           x = SSL_read(slist[i].ssl, s, grab);
           if (x < 0) {
@@ -1323,6 +1325,14 @@ void tputs(int z, char *s, unsigned int len)
         return;
       }
 #ifdef TLS
+      if (socklist[i].flags & SOCK_WS) {
+        printf("net: websocket write() sock %i\n", socklist[i].sock);
+        //printf("VORHER: >>%s<< %i\n", s, len);
+        webui_write(&s, &len);
+        //for (int kk = 0; kk < len; kk++)
+        //  printf("%02x ", (uint8_t) s[kk]);
+        printf("\n");
+      }
       if (socklist[i].ssl) {
         x = SSL_write(socklist[i].ssl, s, len);
         if (x < 0) {

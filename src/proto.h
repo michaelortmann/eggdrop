@@ -134,6 +134,7 @@ int check_ansi(char *);
 void dupwait_notify(char *);
 #ifdef TLS
 int dcc_fingerprint(int);
+void change_to_dcc_telnet_id(int, int);
 #endif
 
 /* dccutil.c */
@@ -362,5 +363,8 @@ int _rfc_casecmp(const char *, const char *);
 int _rfc_ncasecmp(const char *, const char *, int);
 int _rfc_toupper(int);
 int _rfc_tolower(int);
+
+/* webui.c */
+void webui_write(char **, unsigned int *);
 
 #endif /* _EGG_PROTO_H */

@@ -157,13 +157,25 @@ unsigned char favicon_ico[] = {
 
 extern struct dcc_t *dcc;
 
-static void webui_eof(int idx) {
-  debug2("webui: webui_eof() idx %i sock %li", idx, dcc[idx].sock);
-  killsock(dcc[idx].sock);
-  lostdcc(idx);
+void webui_write(char **buf, unsigned int *len) {
+  printf("HERE buf >>%s<< len %i\n", *buf, *len);
+  static uint8_t out[2048];
+  out[0] = 0x81;
+  out[1] = 0x80 | *len; /* mask bit setzen */
+  out[2] = randint(256);
+  out[3] = randint(256);
+  out[4] = randint(256);
+  out[5] = randint(256);
+  for (int i = 0; i < *len; i++) {
+    out[i + 6] = ((uint8_t) (*buf)[i]) ^ out[2 + (i % 4)];
+  } 
+  printf("HERE!!\n");
+  *buf = (char *) out;
+  *len = *len + 6;
 }
 
-static void webui_ws_activity(int idx, char *buf, int len) {
+static void webui_read(int idx, char *buf, int len)
+{
   struct rusage ru1, ru2;
   int r, i;
   uint8_t *key, *payload;
@@ -210,28 +222,23 @@ static void webui_ws_activity(int idx, char *buf, int len) {
            (double) (ru2.ru_stime.tv_sec  - ru1.ru_stime.tv_sec ) * 1000);
 }
 
-static void webui_ws_display(int idx, char *buf) {
+static void webui_ws_display(int idx, char *buf)
+{
   if (!dcc[idx].ssl)
     strcpy(buf, "webui ws");
   else
     strcpy(buf, "webui wss");
 }
 
-struct dcc_table DCC_WEBUI_WS = {
-  "WEBUI_WS",
-  0,
-  webui_eof,
-  webui_ws_activity,
-  NULL,
-  NULL,
-  webui_ws_display,
-  NULL,
-  NULL,
-  NULL,
-  NULL
-};
+static void webui_http_eof(int idx)
+{
+  debug2("webui: webui_http_eof() idx %i sock %li", idx, dcc[idx].sock);
+  killsock(dcc[idx].sock);
+  lostdcc(idx);
+}
 
-static void webui_http_activity(int idx, char *buf, int len) {
+static void webui_http_activity(int idx, char *buf, int len)
+{
   struct rusage ru1, ru2;
   int r, i;
   char response[2048]; /* > sizeof webui.html */
@@ -364,7 +371,17 @@ static void webui_http_activity(int idx, char *buf, int len) {
       "\r\n", out);
     tputs(dcc[idx].sock, response, i);
     debug2("webui: tputs(): >>>%s<<< %i", response, i);
-    changeover_dcc(idx, &DCC_WEBUI_WS, 0);
+
+    struct threaddata *td = threaddata();
+    for (i = 0; i < td->MAXSOCKS; i++)
+      if (td->socklist[i].sock == dcc[idx].sock) {
+        td->socklist[i].flags |= SOCK_WS;
+        printf("SOCK_WS gesetzt fuer socklist %i\n", i);
+        break;
+      }
+    //changeover_dcc(idx, &DCC_WEBUI_WS, 0);
+    change_to_dcc_telnet_id(idx, idx); /* TODO: i stat  idx ?! */
+    printf("CHANGEOVER -> idx %i sock %i\n", idx, dcc[idx].sock);
   } else /* TODO: send 404 or something ? */
     debug0("webui: 404");
   if (len == 511) {
@@ -387,7 +404,8 @@ static void webui_http_activity(int idx, char *buf, int len) {
            (double) (ru2.ru_stime.tv_sec  - ru1.ru_stime.tv_sec ) * 1000);
 }
 
-static void webui_http_display(int idx, char *buf) {
+static void webui_http_display(int idx, char *buf)
+{
   if (!dcc[idx].ssl)
     strcpy(buf, "webui http");
   else
@@ -397,7 +415,7 @@ static void webui_http_display(int idx, char *buf) {
 struct dcc_table DCC_WEBUI_HTTP = {
   "WEBUI_HTTP",
   0,
-  webui_eof,
+  webui_http_eof,
   webui_http_activity,
   NULL,
   NULL,
