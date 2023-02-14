@@ -157,21 +157,18 @@ unsigned char favicon_ico[] = {
 
 extern struct dcc_t *dcc;
 
+
 void webui_write(char **buf, unsigned int *len) {
-  printf("HERE buf >>%s<< len %i\n", *buf, *len);
   static uint8_t out[2048];
-  out[0] = 0x81;
-  out[1] = 0x80 | *len; /* mask bit setzen */
-  out[2] = randint(256);
-  out[3] = randint(256);
-  out[4] = randint(256);
-  out[5] = randint(256);
-  for (int i = 0; i < *len; i++) {
-    out[i + 6] = ((uint8_t) (*buf)[i]) ^ out[2 + (i % 4)];
-  } 
-  printf("HERE!!\n");
+  debug1("webui: webui_write() len %i", *len);
+  out[0] = 0x81; /* FIN + text frame */
+  /* A server MUST NOT mask any frames that it sends to the client. */
+  out[1] = *len;
+  /* TODO: we could offset the initial buffer and get rid of one memmove */
+  memmove(out + 2, *buf, *len);
   *buf = (char *) out;
-  *len = *len + 6;
+  *len = *len + 2;
+  printf("\n");
 }
 
 static void webui_read(int idx, char *buf, int len)
