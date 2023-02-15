@@ -395,6 +395,7 @@ static void webui_http_activity(int idx, char *buf, int len)
     for (i = 0; i < td->MAXSOCKS; i++)
       if (td->socklist[i].sock == dcc[idx].sock) {
         td->socklist[i].flags |= SOCK_WS;
+        debug1("## REMOVE binary flag on socket %i\n", td->socklist[i].sock);
         td->socklist[i].flags &= ~ SOCK_BINARY; /* TODO: maybe not the right place, but we need it for net.c sockgets() */
         strcpy(dcc[idx].host, "*"); /* wichtig fuer spaeter dcc_telnet_id willd_match, aber ob das hier die richtige stelle ist, und noch was anderen fehlt?  TODO */
         /* das .host wird in change_to_dcc_telnet_id zo .nick */

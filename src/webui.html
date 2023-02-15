@@ -20,7 +20,7 @@ Copyright (C) 2023 Eggheads Development Team
       out = document.getElementById("out");
       echo = 1
       ws.addEventListener("message", (event) => {
-        out.innerHTML = out.innerHTML + event.data;
+        out.innerHTML = out.innerHTML + event.data.replace(/[\x01-\x02]/g, "");
         out.scrollTop = out.scrollHeight;
         if (event.data.indexOf(WS_ECHO_ON) > -1) {
           d.type = "text";
