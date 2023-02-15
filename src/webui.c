@@ -157,20 +157,28 @@ unsigned char favicon_ico[] = {
 
 extern struct dcc_t *dcc;
 
-
 void webui_frame(char **buf, unsigned int *len) {
   static uint8_t out[2048];
-  /* KEIN debug() hier, sonst rekursion ?! */
+  /* no debug() or putlog() here or recursion */
   printf("webui: webui_frame() len %u\n", *len);
-  printf("  >>%s<<\n", *buf);
   out[0] = 0x81; /* FIN + text frame */
-  /* A server MUST NOT mask any frames that it sends to the client. */
-  out[1] = *len;
-  /* TODO: we could offset the initial buffer and get rid of one memmove */
-  memmove(out + 2, *buf, *len); /* TODO: if not in place, memcpy() would do instead of memmove() */
-  *buf = (char *) out;
-  *len = *len + 2;
-  printf("\n");
+  /* A server MUST NOT mask any frames that it sends to the client */
+  if (*len < 0x7e) {
+    out[1] = *len;
+    /* TODO: we could offset buf and get rid of this memcpy() */
+    memcpy(out + 2, *buf, *len);
+    *buf = (char *) out;
+    *len = *len + 2;
+  } else {
+    out[1] = 0x7e;
+    uint16_t len2 = htons(*len);
+    memcpy(out + 2, &len2, 2);
+    /* TODO: we could offset buf and get rid of this memcpy() */
+    memcpy(out + 4, *buf, *len);
+    *buf = (char *) out;
+    *len = *len + 4;
+  }
+  /* FIXME:len > 0xffff */
 }
 
 /* TODO: return error code ? */
