@@ -49,10 +49,8 @@ extern unsigned long otraffic_irc, otraffic_irc_today, itraffic_irc,
                      itraffic_bn, itraffic_bn_today, otraffic_dcc,
                      otraffic_dcc_today, itraffic_dcc, itraffic_dcc_today,
                      otraffic_trans, otraffic_trans_today, itraffic_trans,
-                     itraffic_trans_today, otraffic_webui, otraffic_webui_today,
-                     itraffic_webui, itraffic_webui_today, otraffic_unknown,
-                     itraffic_unknown, otraffic_unknown_today,
-                     itraffic_unknown_today;
+                     itraffic_trans_today, otraffic_unknown, itraffic_unknown,
+                     otraffic_unknown_today, itraffic_unknown_today;
 static struct portmap *root = NULL;
 
 
@@ -1436,12 +1434,6 @@ static int tcl_traffic STDVAR
           otraffic_trans + otraffic_trans_today);
   Tcl_AppendElement(irp, buf);
 
-  /* WEBUI traffic */
-  sprintf(buf, "irc %lu %lu %lu %lu", itraffic_webui_today, itraffic_webui +
-          itraffic_webui_today, otraffic_webui_today,
-          otraffic_webui + otraffic_webui_today);
-  Tcl_AppendElement(irp, buf);
-
   /* Misc traffic */
   sprintf(buf, "misc %lu %lu %lu %lu", itraffic_unknown_today,
           itraffic_unknown + itraffic_unknown_today, otraffic_unknown_today,
@@ -1451,14 +1443,14 @@ static int tcl_traffic STDVAR
   /* Totals */
   in_total_today = itraffic_irc_today + itraffic_bn_today +
                    itraffic_dcc_today + itraffic_trans_today +
-                   itraffic_webui_today + itraffic_unknown_today;
+                   itraffic_unknown_today;
   in_total = in_total_today + itraffic_irc + itraffic_bn + itraffic_dcc +
-             itraffic_trans + itraffic_webui + itraffic_unknown;
+             itraffic_trans + itraffic_unknown;
   out_total_today = otraffic_irc_today + otraffic_bn_today +
                     otraffic_dcc_today + itraffic_trans_today +
-                    otraffic_webui_today + otraffic_unknown_today;
+                    otraffic_unknown_today;
   out_total = out_total_today + otraffic_irc + otraffic_bn + otraffic_dcc +
-              otraffic_trans + otraffic_webui + otraffic_unknown;
+              otraffic_trans + otraffic_unknown;
   sprintf(buf, "total %lu %lu %lu %lu", in_total_today, in_total,
           out_total_today, out_total);
   Tcl_AppendElement(irp, buf);

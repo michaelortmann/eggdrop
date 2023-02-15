@@ -8,32 +8,27 @@ Written by Michael Ortmann
 Copyright (C) 2023 Eggheads Development Team
 -->
 <!DOCTYPE html>
-<head><title>Eggdrop</title></head>
-<body bgcolor="#000000" text="#00ff00">
-  Eggdrop
-  <pre id="out">
-  </pre>
-  <input id="d" type="text" class="b" onkeydown="b(this)" autofocus style="position:fixed;bottom:0;width:100%;"/>
-  <script>
-    var ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws:") + location.host + "/w");
-    ws.addEventListener('message', (event) => {
-      console.log(event.data);
-      document.getElementById('out').innerHTML =  document.getElementById('out').innerHTML + event.data;
-    });
-    function b(c) {
-      if(event.key === "Enter") {
-        if (typeof ws === "undefined") {
-
-          ws.onopen = function() {
-            ws.send(c.value);
-            a.textContent = "Password: ";
-            c.value = "";
-          }
-        }
-        else {
+<html style="height:100%;">
+  <head><title>Eggdrop</title></head>
+  <body style="display:grid;grid-template-rows:1fr auto;margin:0px;height:100%;" bgcolor="#282828" text="#ebdbb2">
+    <pre id="out" style="overflow:auto;"></pre>
+    <input id="d" type="text" class="b" onkeydown="b(this)" autofocus style="width:100%;"/>
+    <script>
+      ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws:") + location.host + "/w");
+      out = document.getElementById("out");
+      ws.addEventListener("message", (event) => {
+        out.innerHTML = out.innerHTML + event.data;
+        out.scrollTop = out.scrollHeight;
+      });
+      function b(c) {
+        if(event.key === "Enter") {
           ws.send(c.value);
+          <!-- FIXME: respect telnet codes like echo and bold -->
+          document.getElementById("out").innerHTML = document.getElementById("out").innerHTML + c.value + '\n';
+          out.scrollTop = out.scrollHeight;
+          c.value = "";
         }
       }
-    }
-  </script>
-</body>
+    </script>
+  </body>
+</html>

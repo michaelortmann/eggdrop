@@ -1308,13 +1308,8 @@ void dcc_telnet_hostresolved2(int i, int idx) {
     return;
   }
 
-  debug2("##### %i %i", i, idx);
-  debug2("##### %s %s", dcc[i].type->name, dcc[idx].type->name);
-  debug2("##### %s %s", dcc[i].nick, dcc[idx].nick);
-  debug2("##### %s %s", dcc[i].host, dcc[idx].host);
   tell_dcc(3);
-  //fatal("blabli", 1);
-
+  //fatal("hold my beer", 42);
 
   changeover_dcc(i, &DCC_IDENTWAIT, 0);
   dcc[i].timeval = now;
@@ -1364,6 +1359,7 @@ static void dcc_telnet_hostresolved(int i)
   int idx;
   char s[sizeof lasttelnethost], *userhost;
 
+  debug0("dcc_telnet_hostresolved()");
   strlcpy(dcc[i].host, dcc[i].u.dns->host, UHOSTLEN);
 
   for (idx = 0; idx < dcc_total; idx++)
@@ -1423,13 +1419,8 @@ static void dcc_telnet_hostresolved(int i)
   }
 
   /* Skip ident lookup for webui http */
-  debug3("%i %s %s", LSTN_PUBLIC, dcc[idx].nick, dcc[idx].type->name);
   if (!strcmp(dcc[idx].nick, "(webui)")) {
     debug1("dcc_telnet_hostresolved(): %s -> DCC_WEBUI_HTTP -> skip DCC_IDENTWAIT", dcc[idx].type->name);
-    debug2("##### %i %i", i, idx);
-    debug2("##### %s %s", dcc[i].type->name, dcc[idx].type->name);
-    debug2("##### %s %s", dcc[i].nick, dcc[idx].nick);
-    debug2("##### %s %s", dcc[i].host, dcc[idx].host);
     tell_dcc(3);
     changeover_dcc(i, &DCC_WEBUI_HTTP, 0);
     sockoptions(dcc[i].sock, EGG_OPTION_SET, SOCK_BINARY);
@@ -1441,8 +1432,6 @@ static void dcc_telnet_hostresolved(int i)
   strlcpy(dcc[i].host, userhost, UHOSTLEN);
   dcc_telnet_hostresolved2(i, idx);
 }
-
-
 
 static void eof_dcc_telnet(int idx)
 {
