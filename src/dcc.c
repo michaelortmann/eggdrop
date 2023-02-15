@@ -712,6 +712,8 @@ static void dcc_chat_pass(int idx, char *buf, int atr)
       /* Turn echo back on for telnet sessions (send IAC WON'T ECHO). */
       if (dcc[idx].status & STAT_TELNET)
         tputs(dcc[idx].sock, TLN_IAC_C TLN_WONT_C TLN_ECHO_C "\n", 4);
+      else if (dcc[idx].status & STAT_WS)
+        tputs(dcc[idx].sock, WS_ECHO_ON, 1);
       dcc_chatter(idx);
     }
   } else {
@@ -1560,13 +1562,16 @@ static void dcc_telnet_id(int idx, char *buf, int atr)
   int ok = 0;
   struct flag_record fr = { FR_GLOBAL | FR_CHAN | FR_ANYWH, 0, 0, 0, 0, 0 };
   struct dcc_table *old = dcc[idx].type;
-
   debug3("webui debug: dcc_telnet_id() 1: >>%s<< %i %i", buf, idx, atr);
+  printf("##4## tell_tcc()\n");
+  tell_dcc(3);
   if (detect_telnet((unsigned char *) buf)) {
     dcc[idx].status |= STAT_TELNET;
     strip_telnet(dcc[idx].sock, buf, &atr);
   } else
     dcc[idx].status &= ~STAT_TELNET;
+  printf("##5## tell_tcc()\n");
+  tell_dcc(3);
   buf[HANDLEN] = 0;
   debug5("webui debug: dcc_telnet_id() 2: >>%s<< %i %i %s %i", buf, idx, atr, dcc[idx].nick, wild_match(dcc[idx].nick, buf));
   debug1("idx: %i", idx);
@@ -1821,13 +1826,17 @@ static void dcc_telnet_pass(int idx, int atr)
      */
 
     /* Turn off remote telnet echo (send IAC WILL ECHO). */
+    char buf[1030];
     if (dcc[idx].status & STAT_TELNET) {
-      char buf[1030];
       egg_snprintf(buf, sizeof buf, "\n%s%s\r\n", escape_telnet(DCC_ENTERPASS),
                TLN_IAC_C TLN_WILL_C TLN_ECHO_C);
       tputs(dcc[idx].sock, buf, strlen(buf));
-    } else
+    } else if (dcc[idx].status & STAT_WS) {
+      snprintf(buf, sizeof buf, "\n%s" WS_ECHO_OFF "\n", DCC_ENTERPASS);
+      tputs(dcc[idx].sock, buf, strlen(buf));
+    } else {
       dprintf(idx, "\n%s\n", DCC_ENTERPASS);
+    }
   }
 }
 
@@ -2343,6 +2352,8 @@ struct dcc_table DCC_IDENT = {
 
 static void change_to_dcc_telnet_id(int i) /* i ist der neue idx, ganz so, wie vorher in der funktion drunter, kann gerne spaeter in idx umbenannt werden */
 {
+    printf("##3## tell_tcc()\n");
+    tell_dcc(3);
   printf("WEBUI DEBUG change_to_dcc_telnet_id()\n");
   printf("??? %s %s %s\n", dcc[i].type->name, dcc[i].nick, dcc[i].host);
   dcc[i].type = &DCC_TELNET_ID;
@@ -2378,6 +2389,8 @@ static void dcc_telnet_got_ident(int i, char *host)
   int idx;
   char x[1024];
 
+  printf("##8## tell_tcc()\n");
+  tell_dcc(3);
   for (idx = 0; idx < dcc_total; idx++)
     if ((dcc[idx].type == &DCC_TELNET) &&
         (dcc[idx].sock == dcc[i].u.ident_sock))
@@ -2451,6 +2464,8 @@ static void dcc_telnet_got_ident(int i, char *host)
     /* Note: we don't really care about telnet status here. We use the
      * STATUS option as a hopefully harmless way to detect if the other
      * side is a telnet client or not. */
+    printf("##9## tell_tcc()\n");
+    tell_dcc(3);
 #ifdef TLS
     if (!dcc[i].ssl)
       dprintf(i, TLN_IAC_C TLN_WILL_C TLN_STATUS_C);
@@ -2461,7 +2476,11 @@ static void dcc_telnet_got_ident(int i, char *host)
       dcc[i].status |= STAT_USRONLY;
     else if (!strcmp(dcc[idx].nick, "(bots)"))
       dcc[i].status |= STAT_BOTONLY;
+    else if (!strcmp(dcc[idx].nick, "(webui)"))
+      dcc[i].status |= STAT_WS;
     /* Copy acceptable-nick/host mask */
+    printf("##2## tell_tcc()\n");
+    tell_dcc(3);
     strlcpy(dcc[i].nick, dcc[idx].host, HANDLEN); /* wo ist hier der sinn? dcc[idx].host ist immer *, oder? */
     change_to_dcc_telnet_id(i);
 //}

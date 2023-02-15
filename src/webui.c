@@ -398,11 +398,13 @@ static void webui_http_activity(int idx, char *buf, int len)
         td->socklist[i].flags &= ~ SOCK_BINARY; /* TODO: maybe not the right place, but we need it for net.c sockgets() */
         strcpy(dcc[idx].host, "*"); /* wichtig fuer spaeter dcc_telnet_id willd_match, aber ob das hier die richtige stelle ist, und noch was anderen fehlt?  TODO */
         /* das .host wird in change_to_dcc_telnet_id zo .nick */
-        printf("SOCK_WS gesetzt fuer socklist %i idx %i\n", i, idx);
+        printf("SOCK_WS gesetzt fuer socklist %i idx %i sock %li status %lu\n", i, idx, dcc[idx].sock, dcc[idx].status);
+
         break;
       }
     //changeover_dcc(idx, &DCC_WEBUI_WS, 0);
     dcc[idx].status |= STAT_USRONLY; /* magick */
+    printf("##6## tell_tcc()\n");
     tell_dcc(3);
     //change_to_dcc_telnet_id(idx);
     //fatal("test", 3);
@@ -431,6 +433,8 @@ static void webui_http_activity(int idx, char *buf, int len)
         break;
       }
   }
+  printf("##7## tell_tcc()\n");
+  tell_dcc(3);
   if (!r && !getrusage(RUSAGE_SELF, &ru2))
     debug2("webui: webui_http_activity(): user %.3fms sys %.3fms",
            (double) (ru2.ru_utime.tv_usec - ru1.ru_utime.tv_usec) / 1000 +

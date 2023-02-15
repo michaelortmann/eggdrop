@@ -14,18 +14,31 @@ Copyright (C) 2023 Eggheads Development Team
     <pre id="out" style="overflow:auto;"></pre>
     <input id="d" type="text" class="b" onkeydown="b(this)" autofocus style="width:100%;"/>
     <script>
+      WS_ECHO_ON  = '\x01'
+      WS_ECHO_OFF = '\x02'
       ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws:") + location.host + "/w");
       out = document.getElementById("out");
+      echo = 1
       ws.addEventListener("message", (event) => {
         out.innerHTML = out.innerHTML + event.data;
         out.scrollTop = out.scrollHeight;
+        if (event.data.indexOf(WS_ECHO_ON) > -1) {
+          d.type = "text";
+          echo = 1;
+          console.log("echo on");
+        }
+        else if (event.data.indexOf(WS_ECHO_OFF) > -1) {
+          d.type = "password"
+          echo = 0;
+          console.log("echo off");
+        }
       });
       function b(c) {
         if(event.key === "Enter") {
           ws.send(c.value);
-          <!-- FIXME: respect telnet codes like echo and bold -->
-          document.getElementById("out").innerHTML = document.getElementById("out").innerHTML + c.value + '\n';
-          out.scrollTop = out.scrollHeight;
+          if (echo)
+            document.getElementById("out").innerHTML = document.getElementById("out").innerHTML + c.value + '\n';
+            out.scrollTop = out.scrollHeight;
           c.value = "";
         }
       }
