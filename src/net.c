@@ -995,11 +995,10 @@ int sockread(char *s, int *len, sock_list *slist, int slistmax, int tclonly)
           continue;           /* EAGAIN */
         }
       }
+#ifdef TLS
       if (socklist[i].flags & SOCK_WS)
-      {
-        printf("net: read SOCK_WS %i\n", socklist[i].sock);
         webui_unframe(&s, &x);
-      }
+#endif /* TLS */
       s[x] = 0;
       *len = x;
       debug2("webui debug: WE DID READ -> >>%s<< %i", s, *len);
@@ -1329,14 +1328,8 @@ void tputs(int z, char *s, unsigned int len)
         return;
       }
 #ifdef TLS
-      if (socklist[i].flags & SOCK_WS) {
-        printf("net: write SOCK_WS %i\n", socklist[i].sock);
-        //printf("VORHER: >>%s<< %i\n", s, len);
+      if (socklist[i].flags & SOCK_WS) /* TODO: early enough for un-tls ws? */
         webui_frame(&s, &len);
-        //for (int kk = 0; kk < len; kk++)
-        //  printf("%02x ", (uint8_t) s[kk]);
-        //printf("\n");
-      }
       if (socklist[i].ssl) {
         x = SSL_write(socklist[i].ssl, s, len);
         if (x < 0) {

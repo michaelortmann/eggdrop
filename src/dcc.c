@@ -1423,6 +1423,7 @@ static void dcc_telnet_hostresolved(int i)
     return;
   }
 
+#ifdef TLS
   /* Skip ident lookup for webui http */
   if (!strcmp(dcc[idx].nick, "(webui)")) {
     changeover_dcc(i, &DCC_WEBUI_HTTP, 0);
@@ -1440,6 +1441,8 @@ static void dcc_telnet_hostresolved(int i)
     //strlcpy(dcc[i].host, userhost, UHOSTLEN);
     return;
   }
+#endif /* TLS */
+
   strlcpy(dcc[i].host, userhost, UHOSTLEN);
   dcc_telnet_hostresolved2(i, idx);
 }
