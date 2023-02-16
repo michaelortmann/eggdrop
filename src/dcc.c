@@ -1252,11 +1252,10 @@ static void dcc_telnet(int idx, char *buf, int i)
     return;
   }
   /* Buffer data received on this socket.  */
-  sockoptions(sock, EGG_OPTION_SET, SOCK_BUFFER);
-  //if (!strcmp(dcc[idx].nick, "(webui)")) {
-  //  sockoptions(sock, EGG_OPTION_SET, SOCK_BINARY);
-  //  debug1("===========  EARLY BINARY SOCKET %i", sock);
-  //}
+  if (!strcmp(dcc[idx].nick, "(webui)")) {
+    sockoptions(sock, EGG_OPTION_SET, SOCK_BUFFER);
+    // sockoptions(sock, EGG_OPTION_SET, SOCK_BINARY);
+  }
 
   if (port < 1024) {
     putlog(LOG_BOTS, "*", DCC_BADSRC, iptostr(&dcc[i].sockname.addr.sa), port);
@@ -1314,7 +1313,7 @@ void dcc_telnet_hostresolved2(int i, int idx) {
     return;
   }
 
-  tell_dcc(3);
+  //tell_dcc(3);
   //fatal("hold my beer", 42);
 
   changeover_dcc(i, &DCC_IDENTWAIT, 0);
@@ -1426,8 +1425,6 @@ static void dcc_telnet_hostresolved(int i)
 
   /* Skip ident lookup for webui http */
   if (!strcmp(dcc[idx].nick, "(webui)")) {
-    debug1("dcc_telnet_hostresolved(): %s -> DCC_WEBUI_HTTP -> skip DCC_IDENTWAIT", dcc[idx].type->name);
-    tell_dcc(3);
     changeover_dcc(i, &DCC_WEBUI_HTTP, 0);
     sockoptions(dcc[i].sock, EGG_OPTION_SET, SOCK_BINARY);
 
@@ -1575,15 +1572,11 @@ static void dcc_telnet_id(int idx, char *buf, int atr)
   struct flag_record fr = { FR_GLOBAL | FR_CHAN | FR_ANYWH, 0, 0, 0, 0, 0 };
   struct dcc_table *old = dcc[idx].type;
   debug3("webui debug: dcc_telnet_id() 1: >>%s<< %i %i", buf, idx, atr);
-  printf("##4## tell_tcc()\n");
-  tell_dcc(3);
   if (detect_telnet((unsigned char *) buf)) {
     dcc[idx].status |= STAT_TELNET;
     strip_telnet(dcc[idx].sock, buf, &atr);
   } else
     dcc[idx].status &= ~STAT_TELNET;
-  printf("##5## tell_tcc()\n");
-  tell_dcc(3);
   buf[HANDLEN] = 0;
   debug5("webui debug: dcc_telnet_id() 2: >>%s<< %i %i %s %i", buf, idx, atr, dcc[idx].nick, wild_match(dcc[idx].nick, buf));
   debug1("idx: %i", idx);
@@ -2362,47 +2355,11 @@ struct dcc_table DCC_IDENT = {
   NULL
 };
 
-static void change_to_dcc_telnet_id(int i) /* i ist der neue idx, ganz so, wie vorher in der funktion drunter, kann gerne spaeter in idx umbenannt werden */
-{
-    printf("##3## tell_tcc()\n");
-    tell_dcc(3);
-  printf("WEBUI DEBUG change_to_dcc_telnet_id()\n");
-  printf("??? %s %s %s\n", dcc[i].type->name, dcc[i].nick, dcc[i].host);
-  dcc[i].type = &DCC_TELNET_ID;
-  dcc[i].u.chat = get_data_ptr(sizeof(struct chat_info));
-  egg_bzero(dcc[i].u.chat, sizeof(struct chat_info));
-
-  dcc[i].timeval = now;
-  strcpy(dcc[i].u.chat->con_chan, chanset ? chanset->dname : "*");
-  /* Displays a customizable banner. */
-  if (use_telnet_banner)
-    show_banner(i);
-  /* This is so we don't tell someone doing a portscan anything
-   * about ourselves. <cybah>
-   */
-  if (stealth_telnets) {
-    /* Show here so it doesn't interfere with newline-less stealth_prompt */
-    if (allow_new_telnets)
-      dprintf(i, "(If you are new, enter 'NEW' here.)\n");
-    dprintf(i, "%s", stealth_prompt);
-  } else {
-    dprintf(i, "\n\n");
-    printf("WEBUI DEBUG BANNER\n");
-    sub_lang(i, MISC_BANNER);
-    printf("HAHA -> %s\n", MISC_BANNER);
-    /* Show here so it doesn't get lost before the banner */
-    if (allow_new_telnets)
-      dprintf(i, "(If you are new, enter 'NEW' here.)\n");
-  }
-}
-
 static void dcc_telnet_got_ident(int i, char *host)
 {
   int idx;
   char x[1024];
 
-  printf("##8## tell_tcc()\n");
-  tell_dcc(3);
   for (idx = 0; idx < dcc_total; idx++)
     if ((dcc[idx].type == &DCC_TELNET) &&
         (dcc[idx].sock == dcc[i].u.ident_sock))
@@ -2476,8 +2433,6 @@ static void dcc_telnet_got_ident(int i, char *host)
     /* Note: we don't really care about telnet status here. We use the
      * STATUS option as a hopefully harmless way to detect if the other
      * side is a telnet client or not. */
-    printf("##9## tell_tcc()\n");
-    tell_dcc(3);
 #ifdef TLS
     if (!dcc[i].ssl)
       dprintf(i, TLN_IAC_C TLN_WILL_C TLN_STATUS_C);
@@ -2491,9 +2446,29 @@ static void dcc_telnet_got_ident(int i, char *host)
     else if (!strcmp(dcc[idx].nick, "(webui)"))
       dcc[i].status |= STAT_WS;
     /* Copy acceptable-nick/host mask */
-    printf("##2## tell_tcc()\n");
-    tell_dcc(3);
     strlcpy(dcc[i].nick, dcc[idx].host, HANDLEN); /* wo ist hier der sinn? dcc[idx].host ist immer *, oder? */
-    change_to_dcc_telnet_id(i);
-//}
+  dcc[i].type = &DCC_TELNET_ID;
+  dcc[i].u.chat = get_data_ptr(sizeof(struct chat_info));
+  egg_bzero(dcc[i].u.chat, sizeof(struct chat_info));
+
+  dcc[i].timeval = now;
+  strcpy(dcc[i].u.chat->con_chan, chanset ? chanset->dname : "*");
+  /* Displays a customizable banner. */
+  if (use_telnet_banner)
+    show_banner(i);
+  /* This is so we don't tell someone doing a portscan anything
+   * about ourselves. <cybah>
+   */
+  if (stealth_telnets) {
+    /* Show here so it doesn't interfere with newline-less stealth_prompt */
+    if (allow_new_telnets)
+      dprintf(i, "(If you are new, enter 'NEW' here.)\n");
+    dprintf(i, "%s", stealth_prompt);
+  } else {
+    dprintf(i, "\n\n");
+    sub_lang(i, MISC_BANNER);
+    /* Show here so it doesn't get lost before the banner */
+    if (allow_new_telnets)
+      dprintf(i, "(If you are new, enter 'NEW' here.)\n");
+  }
 }

@@ -1314,9 +1314,8 @@ void tputs(int z, char *s, unsigned int len)
             otraffic_trans_today += len;
           else if (!strncmp(dcc[idx].type->name, "GET", 3))
             otraffic_trans_today += len;
-          else {
+          else
             otraffic_unknown_today += len;
-          }
           break;
         }
       }

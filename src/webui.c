@@ -405,8 +405,6 @@ static void webui_http_activity(int idx, char *buf, int len)
       }
     //changeover_dcc(idx, &DCC_WEBUI_WS, 0);
     dcc[idx].status |= STAT_USRONLY; /* magick */
-    printf("##6## tell_tcc()\n");
-    tell_dcc(3);
     //change_to_dcc_telnet_id(idx);
     //fatal("test", 3);
     extern int dcc_total;
@@ -434,8 +432,6 @@ static void webui_http_activity(int idx, char *buf, int len)
         break;
       }
   }
-  printf("##7## tell_tcc()\n");
-  tell_dcc(3);
   if (!r && !getrusage(RUSAGE_SELF, &ru2))
     debug2("webui: webui_http_activity(): user %.3fms sys %.3fms",
            (double) (ru2.ru_utime.tv_usec - ru1.ru_utime.tv_usec) / 1000 +
