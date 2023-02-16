@@ -204,7 +204,7 @@ void webui_unframe(char **buf, int *len)
     return;
   }
   if (*buf[0] & 0x08) {
-    putlog(LOG_MISC, "*", "webui: webui_ws_activity(): sent connection close -- UNHANDLED CURRENTLY");
+    putlog(LOG_MISC, "*", "WEBUI: fixme: sent connection close not handled yet");
     /*
     debug1("webui: webui_ws_activity(): %s sent connection close",
            iptostr(&dcc[idx].sockname.addr.sa));
@@ -229,14 +229,13 @@ void webui_unframe(char **buf, int *len)
   payload = key + 4;
   for (i = 0; i < *len; i++)
     payload[i] = payload[i] ^ key[i % 4];
-  debug2("webui: content: >>>%.*s<<<", (int) *len, payload);
+  debug2("webui: webui_unframe(): payload >>>%.*ss<<<", (int) *len, payload);
 
   memmove(*buf, payload, *len);
   /* we switched back from binary sock to text sock for sockgets() needs this for dcc_telnet_id() */
   /* so now we have to add \r\n here :/ */
   strcpy(*buf + *len, "\r\n");
   *len+= 2;
-
 }
 
 /*

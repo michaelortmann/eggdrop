@@ -2433,6 +2433,10 @@ static void dcc_telnet_got_ident(int i, char *host)
 //}
 #endif /* TLS */
 //else {
+  dcc[i].type = &DCC_TELNET_ID;
+  dcc[i].u.chat = get_data_ptr(sizeof(struct chat_info));
+  egg_bzero(dcc[i].u.chat, sizeof(struct chat_info));
+
     /* Note: we don't really care about telnet status here. We use the
      * STATUS option as a hopefully harmless way to detect if the other
      * side is a telnet client or not. */
@@ -2450,9 +2454,6 @@ static void dcc_telnet_got_ident(int i, char *host)
       dcc[i].status |= STAT_WS;
     /* Copy acceptable-nick/host mask */
     strlcpy(dcc[i].nick, dcc[idx].host, HANDLEN); /* wo ist hier der sinn? dcc[idx].host ist immer *, oder? */
-  dcc[i].type = &DCC_TELNET_ID;
-  dcc[i].u.chat = get_data_ptr(sizeof(struct chat_info));
-  egg_bzero(dcc[i].u.chat, sizeof(struct chat_info));
 
   dcc[i].timeval = now;
   strcpy(dcc[i].u.chat->con_chan, chanset ? chanset->dname : "*");

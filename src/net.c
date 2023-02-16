@@ -1001,7 +1001,6 @@ int sockread(char *s, int *len, sock_list *slist, int slistmax, int tclonly)
 #endif /* TLS */
       s[x] = 0;
       *len = x;
-      debug2("webui debug: WE DID READ -> >>%s<< %i", s, *len);
       if (slist[i].flags & SOCK_PROXYWAIT) {
         debug2("net: socket: %d proxy errno: %d", slist[i].sock, s[1]);
         slist[i].flags &= ~(SOCK_CONNECT | SOCK_PROXYWAIT);
