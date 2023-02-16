@@ -160,7 +160,10 @@ extern struct dcc_t *dcc;
 void webui_frame(char **buf, unsigned int *len) {
   static uint8_t out[2048];
   /* no debug() or putlog() here or recursion */
+  //printf(">>>%s<<<", *buf);
   printf("webui: webui_frame() len %u\n", *len);
+  //tell_dcc(3);
+  // fatal("hold my beer", 42);
   out[0] = 0x81; /* FIN + text frame */
   /* A server MUST NOT mask any frames that it sends to the client */
   if (*len < 0x7e) {
@@ -409,7 +412,7 @@ static void webui_http_activity(int idx, char *buf, int len)
     extern int dcc_total;
     for (i = 0; i < dcc_total; i++) /* quick hack, we need to link from idx, dont we? */
       if (!strcmp(dcc[i].nick, "(webui)")) {
-        printf("FOUND !!}n");
+        printf("FOUND !!\n");
         break;
       }
     dcc[idx].u.other = NULL; /* fix ATTEMPTING TO FREE NON-MALLOC'D PTR: dccutil.c (561) */

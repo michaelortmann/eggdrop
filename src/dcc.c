@@ -1345,6 +1345,11 @@ void dcc_telnet_hostresolved2(int i, int idx) {
       sock = dcc[j].sock;
     }
   }
+
+  //tell_dcc(3);
+  //printf("j %i\n", j);
+  //fatal("hold my beer", 42);
+
   if (j < 0) {
     dcc_telnet_got_ident(i, userhost);
     return;
@@ -2441,7 +2446,7 @@ static void dcc_telnet_got_ident(int i, char *host)
      * STATUS option as a hopefully harmless way to detect if the other
      * side is a telnet client or not. */
 #ifdef TLS
-    if (!dcc[i].ssl)
+    if (!dcc[i].ssl && strcmp(dcc[idx].nick, "(webui)"))
       dprintf(i, TLN_IAC_C TLN_WILL_C TLN_STATUS_C);
 #endif
     /* Copy acceptable-nick/host mask */
