@@ -709,11 +709,15 @@ static void dcc_chat_pass(int idx, char *buf, int atr)
       dcc[idx].status &= ~STAT_CHAT;
       dcc[idx].u.chat->con_flags = (atr & USER_MASTER) ? conmask : 0;
       dcc[idx].u.chat->channel = -2;
-      /* Turn echo back on for telnet sessions (send IAC WON'T ECHO). */
+      /* In case echo was off, turn it back on */
       if (dcc[idx].status & STAT_TELNET)
-        tputs(dcc[idx].sock, TLN_IAC_C TLN_WONT_C TLN_ECHO_C "\n", 4);
+        /* For telnet sessions (send IAC WON'T ECHO) */
+        tputs(dcc[idx].sock, TLN_IAC_C TLN_WONT_C TLN_ECHO_C, 3);
+#ifdef TLS
       else if (dcc[idx].status & STAT_WS)
+        /* For webui sessions */
         tputs(dcc[idx].sock, WS_ECHO_ON, 1);
+#endif /* TLS */
       dcc_chatter(idx);
     }
   } else {
@@ -728,9 +732,15 @@ static void dcc_chat_pass(int idx, char *buf, int atr)
     putlog(LOG_MISC, "*", DCC_BADLOGIN, dcc[idx].nick,
            dcc[idx].host, dcc[idx].port);
     if (dcc[idx].u.chat->away) {        /* su from a dumb user */
-      /* Turn echo back on for telnet sessions (send IAC WON'T ECHO). */
+      /* In case echo was off, turn it back on */
       if (dcc[idx].status & STAT_TELNET)
-        tputs(dcc[idx].sock, TLN_IAC_C TLN_WONT_C TLN_ECHO_C "\n", 4);
+        /* For telnet sessions send IAC WON'T ECHO */
+        tputs(dcc[idx].sock, TLN_IAC_C TLN_WONT_C TLN_ECHO_C, 3);
+#ifdef TLS
+      else if (dcc[idx].status & STAT_WS)
+        /* For webui sessions */
+        tputs(dcc[idx].sock, WS_ECHO_ON, 1);
+#endif /* TLS */
       dcc[idx].user = get_user_by_handle(userlist, dcc[idx].u.chat->away);
       strlcpy(dcc[idx].nick, dcc[idx].u.chat->away, sizeof dcc[idx].nick);
       nfree(dcc[idx].u.chat->away);
@@ -1838,18 +1848,23 @@ static void dcc_telnet_pass(int idx, int atr)
      *       <Cybah>
      */
 
-    /* Turn off remote telnet echo (send IAC WILL ECHO). */
-    char buf[1030];
+    /* Turn off remote echo*/
+    char buf[1024];
     if (dcc[idx].status & STAT_TELNET) {
-      egg_snprintf(buf, sizeof buf, "\n%s%s\r\n", escape_telnet(DCC_ENTERPASS),
-               TLN_IAC_C TLN_WILL_C TLN_ECHO_C);
+      /* For telnet sessions send IAC WILL ECHO */
+      snprintf(buf, sizeof buf, "\n%s" TLN_IAC_C TLN_WILL_C TLN_ECHO_C "\r\n",
+               escape_telnet(DCC_ENTERPASS));
       tputs(dcc[idx].sock, buf, strlen(buf));
+      //dprintf(idx, "\n%s" TLN_IAC_C TLN_WILL_C TLN_ECHO_C "\n",
+      //        escape_telnet(DCC_ENTERPASS));
+#ifdef TLS
     } else if (dcc[idx].status & STAT_WS) {
+      /* For webui sessions */
       snprintf(buf, sizeof buf, "\n%s" WS_ECHO_OFF "\n", DCC_ENTERPASS);
       tputs(dcc[idx].sock, buf, strlen(buf));
-    } else {
+#endif /* TLS */
+    } else
       dprintf(idx, "\n%s\n", DCC_ENTERPASS);
-    }
   }
 }
 
