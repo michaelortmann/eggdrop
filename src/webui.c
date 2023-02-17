@@ -302,13 +302,13 @@ static void webui_http_activity(int idx, char *buf, int len)
      * only later will snprintf() remove one %, and a size mismatch about Content-Len could occur
      */
 
-    #define PATH "webui.html" /* TODO: its not copied by "make install" yet, pls copy manually into the eggdrop install dir */
+    #define PATH "text/webui.html" /* TODO: its not copied by "make install" yet, pls copy manually into the eggdrop install dir */
     int fd;
     struct stat sb;
     char *body;
     if ((fd = open(PATH, O_RDONLY)) < 0) {
       putlog(LOG_MISC, "*", "WEBUI error: open(" PATH "): %s", strerror(errno));
-      /* TODO: lostdcc() killsock() */
+      /* TODO: send 404 and/or lostdcc() killsock() */
       return;
     }
     if (fstat(fd, &sb) < 0) {
