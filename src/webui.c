@@ -340,7 +340,6 @@ static void webui_http_activity(int idx, char *buf, int len)
     debug0("webui: GET /favicon.ico");
     i = snprintf(response, sizeof response,
       "HTTP/1.1 200 \r\n" /* textual phrase is OPTIONAL */
-      //"Connection: close\r\n" // or keep-alive, gross kleinschreibung wahrscheinlich egal */
       "Content-Length: %li\r\n"
       "Content-Type: image/x-icon\r\n"
       "Server: Eggdrop/%s+%s\r\n"
@@ -408,7 +407,6 @@ static void webui_http_activity(int idx, char *buf, int len)
     //changeover_dcc(idx, &DCC_WEBUI_WS, 0);
     dcc[idx].status |= STAT_USRONLY; /* magick */
     //change_to_dcc_telnet_id(idx);
-    //fatal("test", 3);
     extern int dcc_total;
     for (i = 0; i < dcc_total; i++) /* quick hack, we need to link from idx, dont we? */
       if (!strcmp(dcc[i].nick, "(webui)")) {
@@ -417,7 +415,6 @@ static void webui_http_activity(int idx, char *buf, int len)
       }
     dcc[idx].u.other = NULL; /* fix ATTEMPTING TO FREE NON-MALLOC'D PTR: dccutil.c (561) */
     dcc_telnet_hostresolved2(idx, i);
-    //fatal("test", 4);
 
     printf("CHANGEOVER -> idx %i sock %li\n", idx, dcc[idx].sock);
   } else /* TODO: send 404 or something ? */
