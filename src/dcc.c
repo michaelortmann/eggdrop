@@ -1302,10 +1302,12 @@ static void dcc_telnet(int idx, char *buf, int i)
   dcc_dnshostbyip(&dcc[i].sockname);
 }
 
-/* wir benoetigt, da dcc_telnet_hostresolved() nach webui DCC_TABLE umleiten kann und dann am ende aber wieder hier wietermachen muss */
+/* we need this for dcc_telnet_hostresolved() could now branch to DCC_TABLE
+ * and for either branch wen need to continue here
+ */
 void dcc_telnet_hostresolved2(int i, int idx) {
   int j, sock;
-  char *userhost = dcc[idx].host; /* host zurueck nach userhost und wieder zurueck scheint irgendwie doppeltgemoppelt */
+  char *userhost = dcc[idx].host; /* TODO: writing host back to userhost looks like back and forth copying */
   /* Skip ident lookup if disabled */
   if (identtimeout <= 0) {
     dcc[i].u.ident_sock = dcc[idx].sock;

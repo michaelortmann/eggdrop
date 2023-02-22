@@ -37,7 +37,7 @@ Copyright (C) 2023 Eggheads Development Team
         if(event.key === "Enter") {
           ws.send(c.value);
           if (echo)
-            document.getElementById("out").innerHTML = document.getElementById("out").innerHTML + c.value + '\n';
+            out.innerHTML = out.innerHTML + c.value + '\n';
             out.scrollTop = out.scrollHeight;
           c.value = "";
         }

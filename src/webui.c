@@ -28,6 +28,7 @@ uint8_t alert[] = {0x15, 0x03, 0x01, 0x00, 0x02, 0x02, 0x0a};
 
 /* wget https://www.eggheads.org/favicon.ico
  * xxd -i favicon.ico
+ * TODO: discuss whether or not to inline favicon.ico
  */
 unsigned char favicon_ico[] = {
   0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x24, 0x00, 0x24, 0x00, 0xf7, 0x00,
@@ -262,7 +263,10 @@ static void webui_http_activity(int idx, char *buf, int len)
 {
   struct rusage ru1, ru2;
   int r, i;
-  char response[2048]; /* > sizeof webui.html */
+  char response[4096]; /* > sizeof webui.html
+                        * TODO: dynamic size? else buffer overflow ;)
+                        * we dont control webui.html size, that is user input!
+                        */
 
   if (len < 6) { /* TODO: better len check */
     putlog(LOG_MISC, "*",
@@ -287,22 +291,7 @@ static void webui_http_activity(int idx, char *buf, int len)
   debug0("webui: http()");
   if (buf[5] == ' ') {
     debug0("webui: webui: GET /");
-
-    /* the html / js page was hard to maintain inline this C source,
-     * so i moved it to a file
-     * and we will read it here
-     * further benefits are:
-     * a user could customize the file, like changing colors
-     * the file is modifyable on the fly, eggdrop would not have to be restartet to take effect
-     * there is always the option, to move the file into inline at a later time
-     * discussion could be have, to inline or not to inline, regarding
-     * webui.html and / or favicon.ico
-     *
-     * beware of things like style=\"width: 100%%\" because %% could count as two chars when using sizeof on a string literal
-     * only later will snprintf() remove one %, and a size mismatch about Content-Len could occur
-     */
-
-    #define PATH "text/webui.html" /* TODO: its not copied by "make install" yet, pls copy manually into the eggdrop install dir */
+    #define PATH "text/webui.html"
     int fd;
     struct stat sb;
     char *body;
