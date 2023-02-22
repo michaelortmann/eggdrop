@@ -191,15 +191,8 @@ static void dcc_files_pass(int idx, char *buf, int x)
       return;
     }
     dcc[idx].type = &DCC_FILES;
-    /* In case echo was off, turn it back on */
     if (dcc[idx].status & STAT_TELNET)
-      /* For telnet sessions send IAC WON'T ECHO */
-      tputs(dcc[idx].sock, TLN_IAC_C TLN_WONT_C TLN_ECHO_C, 3);
-#ifdef TLS
-    else if (dcc[idx].status & STAT_WS)
-      /* For webui sessions */
-      tputs(dcc[idx].sock, WS_ECHO_ON, 1);
-#endif /* TLS */
+      dprintf(idx, TLN_IAC_C TLN_WONT_C TLN_ECHO_C "\n");   /* turn echo back on */
     putlog(LOG_FILES, "*", "File system: [%s]%s/%d", dcc[idx].nick,
            dcc[idx].host, dcc[idx].port);
     if (!welcome_to_files(idx)) {

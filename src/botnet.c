@@ -1454,15 +1454,9 @@ static void eof_dcc_relay(int idx)
     return;
   }
   dcc[j].status = dcc[j].u.relay->old_status;
-  /* In case echo was off, turn it back on */
+  /* In case echo was off, turn it back on (send IAC WON'T ECHO): */
   if (dcc[j].status & STAT_TELNET)
-    /* For telnet sessions send IAC WON'T ECHO */
-    tputs(dcc[j].sock, TLN_IAC_C TLN_WONT_C TLN_ECHO_C, 3);
-#ifdef TLS
-  else if (dcc[idx].status & STAT_WS)
-    /* For webui sessions */
-    tputs(dcc[j].sock, WS_ECHO_ON, 1);
-#endif /* TLS */
+    dprintf(j, TLN_IAC_C TLN_WONT_C TLN_ECHO_C "\n");
   putlog(LOG_MISC, "*", "%s: %s -> %s", BOT_ENDRELAY1, dcc[j].nick,
          dcc[idx].nick);
   dprintf(j, "\n\n*** %s %s\n", BOT_ENDRELAY2, botnetnick);
@@ -1561,15 +1555,9 @@ static void dcc_relaying(int idx, char *buf, int j)
   for (j = 0; (dcc[j].sock != dcc[idx].u.relay->sock) ||
        (dcc[j].type != &DCC_RELAY); j++);
   dcc[idx].status = dcc[idx].u.relay->old_status;
-  /* In case echo was off, turn it back on */
+  /* In case echo was off, turn it back on (send IAC WON'T ECHO): */
   if (dcc[idx].status & STAT_TELNET)
-    /* For telnet sessions send IAC WON'T ECHO */
-    tputs(dcc[idx].sock, TLN_IAC_C TLN_WONT_C TLN_ECHO_C, 3);
-#ifdef TLS
-  else if (dcc[idx].status & STAT_WS)
-    /* For webui sessions */
-    tputs(dcc[idx].sock, WS_ECHO_ON, 1);
-#endif /* TLS */
+    dprintf(idx, TLN_IAC_C TLN_WONT_C TLN_ECHO_C "\n");
   dprintf(idx, "\n(%s %s.)\n", BOT_BREAKRELAY, dcc[j].nick);
   dprintf(idx, "%s %s.\n\n", BOT_ABORTRELAY2, botnetnick);
   putlog(LOG_MISC, "*", "%s: %s -> %s", BOT_RELAYBROKEN,

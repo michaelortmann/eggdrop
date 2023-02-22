@@ -2760,18 +2760,10 @@ static void cmd_su(struct userrec *u, int idx, char *par)
         strcpy(dcc[idx].u.chat->su_nick, dcc[idx].nick);
         dcc[idx].user = u;
         strcpy(dcc[idx].nick, par);
-        /* Display password prompt and turn off echo */
-        if (dcc[idx].status & STAT_TELNET)
-          /* For telnet sessions send IAC WILL ECHO */
-          dprintf(idx, "Enter password for %s"
-                       TLN_IAC_C TLN_WILL_C TLN_ECHO_C "\n", par);
-#ifdef TLS
-        else if (dcc[idx].status & STAT_WS)
-          /* For webui sessions */
-          dprintf(idx, "Enter password for %s" WS_ECHO_OFF "\n", par);
-#endif /* TLS */
-        else
-          dprintf(idx, "Enter password for %s\n", par);
+        /* Display password prompt and turn off echo (send IAC WILL ECHO). */
+        dprintf(idx, "Enter password for %s%s\n", par,
+                (dcc[idx].status & STAT_TELNET) ? TLN_IAC_C TLN_WILL_C
+                TLN_ECHO_C : "");
         dcc[idx].type = &DCC_CHAT_PASS;
       } else if (atr & USER_OWNER) {
         if (dcc[idx].u.chat->channel < GLOBAL_CHANS)
