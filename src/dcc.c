@@ -1442,8 +1442,7 @@ static void dcc_telnet_hostresolved(int i)
      * das andere UNSET spaeter kann dann evtl raus?
      */
     sockoptions(dcc[i].sock, EGG_OPTION_UNSET, SOCK_BUFFER);
-
-    //dcc[i].u.other = NULL;
+    dcc[i].u.other = NULL; /* important, else nfree() error in lostdcc on eof */
     //strcpy(dcc[i].nick, "*");
     //strlcpy(dcc[i].host, userhost, UHOSTLEN);
     return;
