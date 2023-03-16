@@ -586,7 +586,8 @@ int open_telnet_raw(int sock, sockname_t *addr)
       FD_SET(sock, &sockset);
       select(sock + 1, &sockset, NULL, NULL, &tv);
       res_len = sizeof(res);
-      getsockopt(sock, SOL_SOCKET, SO_ERROR, &res, &res_len);
+      int r = getsockopt(sock, SOL_SOCKET, SO_ERROR, &res, &res_len);
+      printf("getsockopt() return %i res %i %s errno %i %s\n", r, res, strerror(res), errno, strerror(errno));
       if (res == EINPROGRESS) /* Operation now in progress */
         return sock; /* This could probably fail somewhere */
       if (res == ECONNREFUSED) { /* Connection refused */

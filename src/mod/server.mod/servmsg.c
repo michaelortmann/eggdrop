@@ -2183,12 +2183,14 @@ static void server_resolve_success(int servidx)
 {
   char pass[121];
 
+  printf("server_resolve_success()\n");
   resolvserv = 0;
   strlcpy(pass, dcc[servidx].u.dns->cbuf, sizeof pass);
   changeover_dcc(servidx, &SERVER_SOCKET, 0);
   dcc[servidx].sock = getsock(dcc[servidx].sockname.family, 0);
   setsnport(dcc[servidx].sockname, dcc[servidx].port);
   serv = open_telnet_raw(dcc[servidx].sock, &dcc[servidx].sockname);
+  printf("server_resolve_success(): open_telnet_raw returned %i\n", serv);
   if (serv < 0) {
     char *errstr = NULL;
     if (errno == EINVAL) {
@@ -2221,6 +2223,7 @@ static void server_resolve_success(int servidx)
   strcpy(botname, origbotname);
   /* Start alternate nicks from the beginning */
   altnick_char = 0;
+  printf("server_resolve_success(): preinit-server and dprintf(DP_MODE)\n");
   check_tcl_event("preinit-server");
   ncapeslist = Tcl_NewListObj(0, NULL);
   /* See if server supports CAP command */
