@@ -1453,18 +1453,7 @@ static void dcc_telnet_hostresolved(int i)
 #ifdef TLS
   /* Skip ident lookup for webui http */
   if (!strcmp(dcc[idx].nick, "(webui)")) {
-    changeover_dcc(i, &DCC_WEBUI_HTTP, 0);
-    sockoptions(dcc[i].sock, EGG_OPTION_SET, SOCK_BINARY);
-
-    /* 20230217 23:50 muss fuer Chrome hier sein,
-     * denn der schickt w/ VOR dcc_telnet_hostresolved()
-     *
-     * das andere UNSET spaeter kann dann evtl raus?
-     */
-    sockoptions(dcc[i].sock, EGG_OPTION_UNSET, SOCK_BUFFER);
-    dcc[i].u.other = NULL; /* important, else nfree() error in lostdcc on eof */
-    //strcpy(dcc[i].nick, "*");
-    //strlcpy(dcc[i].host, userhost, UHOSTLEN);
+    webui_dcc_telnet_hostresolved(i);
     return;
   }
 #endif /* TLS */

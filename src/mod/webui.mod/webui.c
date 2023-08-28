@@ -1,36 +1,58 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * webui.c
- *   partyline web user interface
- *
- * Written by Michael Ortmann
- *
+ * webui.c -- part of webui.mod
+ */
+/*
+ * Copyright (C) 2023 Michael Ortmann MIT License
  * Copyright (C) 2023 Eggheads Development Team
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ *
  */
 
-#include "main.h"
+#define MODULE_NAME "webui"
 
-#ifdef TLS
-
-#include <errno.h>
 #include <fcntl.h> /* open */
 #include <resolv.h> /* base64 encode b64_ntop() and base64 decode b64_pton() */
 #include <sys/mman.h> /* mmap */
 #include <sys/resource.h> /* getrusage */
 #include <sys/stat.h> /* fstat */
 #include <openssl/sha.h>
-#include "version.h"
+#include "src/mod/module.h"
+#include <errno.h>
+#include "src/version.h"
+// #include main.h
+
+#define GET_INDEX   "GET / "
+#define GET_FAVICON "GET /favicon.ico "
+#define GET_W       "GET /w "
+#define WS_GUID     "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+#define WS_LEN      28 /* length of Sec-WebSocket-Accept header field value
+                        * import math; (4 * math.ceil(20 / 3)) */
+
+static Function *global = NULL, *server_funcs = NULL;
 
 /* 0x15 = TLS ContentType alert
  * 0x0a = TLS Alert       unexpected_message
  */
-uint8_t alert[] = {0x15, 0x03, 0x01, 0x00, 0x02, 0x02, 0x0a};
+static uint8_t alert[] = {0x15, 0x03, 0x01, 0x00, 0x02, 0x02, 0x0a};
 
 /* wget https://www.eggheads.org/favicon.ico
  * xxd -i favicon.ico
  * TODO: discuss whether or not to inline favicon.ico
  */
-unsigned char favicon_ico[] = {
+static unsigned char favicon_ico[] = {
   0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x24, 0x00, 0x24, 0x00, 0xf7, 0x00,
   0x00, 0x2e, 0x2c, 0x2d, 0x23, 0x22, 0x24, 0x31, 0x31, 0x32, 0x3c, 0x3b,
   0x3c, 0x46, 0x41, 0x3f, 0x3a, 0x4a, 0x51, 0x3e, 0x5e, 0x71, 0x45, 0x44,
@@ -148,109 +170,6 @@ unsigned char favicon_ico[] = {
   0xb4, 0x46, 0x19, 0x77, 0x80, 0xe1, 0xd0, 0xab, 0x0b, 0x05, 0x04, 0x00,
   0x3b
 };
-
-#define GET_INDEX   "GET / "
-#define GET_FAVICON "GET /favicon.ico "
-#define GET_W       "GET /w "
-#define WS_GUID     "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-#define WS_LEN      28 /* length of Sec-WebSocket-Accept header field value
-                        * import math; (4 * math.ceil(20 / 3)) */
-
-extern struct dcc_t *dcc;
-
-void webui_frame(char **buf, unsigned int *len) {
-  static uint8_t out[2048];
-  /* no debug() or putlog() here or recursion */
-  //printf(">>>%s<<<", *buf);
-  printf("webui: webui_frame() len %u\n", *len);
-  //tell_dcc(3);
-  // fatal("hold my beer", 42);
-  out[0] = 0x81; /* FIN + text frame */
-  /* A server MUST NOT mask any frames that it sends to the client */
-  if (*len < 0x7e) {
-    out[1] = *len;
-    /* TODO: we could offset buf and get rid of this memcpy() */
-    memcpy(out + 2, *buf, *len);
-    *buf = (char *) out;
-    *len = *len + 2;
-  } else {
-    out[1] = 0x7e;
-    uint16_t len2 = htons(*len);
-    memcpy(out + 2, &len2, 2);
-    /* TODO: we could offset buf and get rid of this memcpy() */
-    memcpy(out + 4, *buf, *len);
-    *buf = (char *) out;
-    *len = *len + 4;
-  }
-  /* FIXME:len > 0xffff */
-}
-
-/* TODO: return error code ? */
-void webui_unframe(char **buf, int *len)
-{
-  int i;
-  uint8_t *key, *payload;
-
-  debug1("webui: webui_unframe(): len %i", *len);
-  if (*len < 6) { /* TODO: better len check */
-
-
-
-    /* TODO: return error code ? */
-    putlog(LOG_MISC, "*", "WEBUI error: someone sent something other than WebSocket protocol");
-    /*
-    putlog(LOG_MISC, "*",
-           "WEBUI error: %s sent something other than WebSocket protocol",
-           iptostr(&dcc[idx].sockname.addr.sa));
-    killsock(dcc[idx].sock);
-    lostdcc(idx);
-    */
-    return;
-  }
-  if (*buf[0] & 0x08) {
-    putlog(LOG_MISC, "*", "WEBUI: fixme: sent connection close not handled yet");
-    /*
-    debug1("webui: webui_ws_activity(): %s sent connection close",
-           iptostr(&dcc[idx].sockname.addr.sa));
-    killsock(dcc[idx].sock);
-    lostdcc(idx);
-    */
-    return;
-  }
-  /* xor decrypt
-   */
-  key = (uint8_t *) *buf;
-  if (key[1] < 0xfe) {
-    key += 2;
-    *len -= 6;
-  } else if (key[1] == 0xfe) {
-    key += 4;
-    *len -= 8;
-  } else {
-    key += 10;
-    *len -= 14;
-  }
-  payload = key + 4;
-  for (i = 0; i < *len; i++)
-    payload[i] = payload[i] ^ key[i % 4];
-  debug2("webui: webui_unframe(): payload >>>%.*s<<<", (int) *len, payload);
-
-  memmove(*buf, payload, *len);
-  /* we switched back from binary sock to text sock for sockgets() needs this for dcc_telnet_id() */
-  /* so now we have to add \r\n here :/ */
-  strcpy(*buf + *len, "\r\n");
-  *len+= 2;
-}
-
-/*
-static void webui_ws_display(int idx, char *buf)
-{
-  if (!dcc[idx].ssl)
-    strcpy(buf, "webui ws");
-  else
-    strcpy(buf, "webui wss");
-}
-*/
 
 static void webui_http_eof(int idx)
 {
@@ -381,22 +300,19 @@ static void webui_http_activity(int idx, char *buf, int len)
     tputs(dcc[idx].sock, response, i);
     debug2("webui: tputs(): >>>%s<<< %i", response, i);
 
-    struct threaddata *td = threaddata();
-    for (i = 0; i < td->MAXSOCKS; i++)
-      if (td->socklist[i].sock == dcc[idx].sock) {
-        td->socklist[i].flags |= SOCK_WS;
-        debug1("## REMOVE binary flag on socket %i\n", td->socklist[i].sock);
-        td->socklist[i].flags &= ~ SOCK_BINARY; /* TODO: maybe not the right place, but we need it for net.c sockgets() */
-        strcpy(dcc[idx].host, "*"); /* wichtig fuer spaeter dcc_telnet_id willd_match, aber ob das hier die richtige stelle ist, und noch was anderen fehlt?  TODO */
-        /* das .host wird in change_to_dcc_telnet_id zo .nick */
-        printf("SOCK_WS gesetzt fuer socklist %i idx %i sock %li status %lu\n", i, idx, dcc[idx].sock, dcc[idx].status);
+    sock_list* socklist_i = &socklist[findsock(dcc[idx].sock)];
+    socklist_i->flags |= SOCK_WS;
 
-        break;
-      }
+    debug2("## REMOVE binary flag on socketlist_socket %i dcc_socket should be equal %li\n", socklist_i->sock, dcc[idx].sock);
+    socklist_i->flags &= ~ SOCK_BINARY; /* TODO: maybe not the right place, but we need it for net.c sockgets() */
+    strcpy(dcc[idx].host, "*"); /* wichtig fuer spaeter dcc_telnet_id willd_match, aber ob das hier die richtige stelle ist, und noch was anderen fehlt?  TODO */
+    /* das .host wird in change_to_dcc_telnet_id zo .nick */
+    printf("SOCK_WS gesetzt fuer socklist %i idx %i sock %li status %lu\n", findsock(dcc[idx].sock), idx, dcc[idx].sock, dcc[idx].status);
+
     //changeover_dcc(idx, &DCC_WEBUI_WS, 0);
     dcc[idx].status |= STAT_USRONLY; /* magick */
     //change_to_dcc_telnet_id(idx);
-    extern int dcc_total;
+    //extern int dcc_total;
     for (i = 0; i < dcc_total; i++) /* quick hack, we need to link from idx, dont we? */
       if (!strcmp(dcc[i].nick, "(webui)")) {
         printf("FOUND !!\n");
@@ -410,15 +326,12 @@ static void webui_http_activity(int idx, char *buf, int len)
     debug0("webui: 404");
   if (len == 511) {
     /* read probable remaining bytes */
-    struct threaddata *td = threaddata();
-    for (i = 0; i < td->MAXSOCKS; i++)
-      if (td->socklist[i].sock == dcc[idx].sock) {
-        if (td->socklist[i].ssl)
-          debug1("webui: SSL_read(): len %i", SSL_read(td->socklist[i].ssl, buf, 511));
-        else
-          debug1("webui: read(): len %li", read(dcc[idx].sock, buf, 511));
-        break;
-      }
+    
+    SSL *ssl = socklist[findsock(dcc[idx].sock)].ssl;
+    if (ssl)
+      debug1("webui: SSL_read(): len %i", SSL_read(ssl, buf, 511));
+    else
+      debug1("webui: read(): len %li", read(dcc[idx].sock, buf, 511));
   }
   if (!r && !getrusage(RUSAGE_SELF, &ru2))
     debug2("webui: webui_http_activity(): user %.3fms sys %.3fms",
@@ -436,6 +349,9 @@ static void webui_http_display(int idx, char *buf)
     strcpy(buf, "webui https");
 }
 
+
+
+
 struct dcc_table DCC_WEBUI_HTTP = {
   "WEBUI_HTTP",
   0,
@@ -450,4 +366,157 @@ struct dcc_table DCC_WEBUI_HTTP = {
   NULL
 };
 
-#endif /* TLS */
+void webui_dcc_telnet_hostresolved(int i)
+{
+    changeover_dcc(i, &DCC_WEBUI_HTTP, 0);
+    sockoptions(dcc[i].sock, EGG_OPTION_SET, SOCK_BINARY);
+
+    /* 20230217 23:50 muss fuer Chrome hier sein,
+     * denn der schickt w/ VOR dcc_telnet_hostresolved()
+     *
+     * das andere UNSET spaeter kann dann evtl raus?
+     */
+    sockoptions(dcc[i].sock, EGG_OPTION_UNSET, SOCK_BUFFER);
+    dcc[i].u.other = NULL; /* important, else nfree() error in lostdcc on eof */
+    //strcpy(dcc[i].nick, "*");
+    //strlcpy(dcc[i].host, userhost, UHOSTLEN);
+}
+
+void webui_frame(char **buf, unsigned int *len) {
+  static uint8_t out[2048];
+  /* no debug() or putlog() here or recursion */
+  //printf(">>>%s<<<", *buf);
+  printf("webui: webui_frame() len %u\n", *len);
+  //tell_dcc(3);
+  // fatal("hold my beer", 42);
+  out[0] = 0x81; /* FIN + text frame */
+  /* A server MUST NOT mask any frames that it sends to the client */
+  if (*len < 0x7e) {
+    out[1] = *len;
+    /* TODO: we could offset buf and get rid of this memcpy() */
+    memcpy(out + 2, *buf, *len);
+    *buf = (char *) out;
+    *len = *len + 2;
+  } else {
+    out[1] = 0x7e;
+    uint16_t len2 = htons(*len);
+    memcpy(out + 2, &len2, 2);
+    /* TODO: we could offset buf and get rid of this memcpy() */
+    memcpy(out + 4, *buf, *len);
+    *buf = (char *) out;
+    *len = *len + 4;
+  }
+  /* FIXME:len > 0xffff */
+}
+
+/* TODO: return error code ? */
+void webui_unframe(char *buf, int *len)
+{
+  int i;
+  uint8_t *key, *payload;
+
+  debug1("webui: webui_unframe(): len %i", *len);
+  if (*len < 6) { /* TODO: better len check */
+
+
+
+    /* TODO: return error code ? */
+    putlog(LOG_MISC, "*", "WEBUI error: someone sent something other than WebSocket protocol");
+    /*
+    putlog(LOG_MISC, "*",
+           "WEBUI error: %s sent something other than WebSocket protocol",
+           iptostr(&dcc[idx].sockname.addr.sa));
+    killsock(dcc[idx].sock);
+    lostdcc(idx);
+    */
+    return;
+  }
+  if (buf[0] & 0x08) {
+    putlog(LOG_MISC, "*", "WEBUI: fixme: sent connection close not handled yet");
+    /*
+    debug1("webui: webui_ws_activity(): %s sent connection close",
+           iptostr(&dcc[idx].sockname.addr.sa));
+    killsock(dcc[idx].sock);
+    lostdcc(idx);
+    */
+    return;
+  }
+  /* xor decrypt
+   */
+  key = (uint8_t *) buf;
+  if (key[1] < 0xfe) {
+    key += 2;
+    *len -= 6;
+  } else if (key[1] == 0xfe) {
+    key += 4;
+    *len -= 8;
+  } else {
+    key += 10;
+    *len -= 14;
+  }
+  payload = key + 4;
+  for (i = 0; i < *len; i++)
+    payload[i] = payload[i] ^ key[i % 4];
+  debug2("webui: webui_unframe(): payload >>>%.*s<<<", (int) *len, payload);
+
+  memmove(buf, payload, *len);
+  /* we switched back from binary sock to text sock for sockgets() needs this for dcc_telnet_id() */
+  /* so now we have to add \r\n here :/ */
+  strcpy(buf + *len, "\r\n");
+  *len+= 2;
+}
+
+static char *webui_close(void)
+{
+  del_hook(HOOK_DCC_TELNET_HOSTRESOLVED, (Function) webui_dcc_telnet_hostresolved);
+  del_hook(HOOK_WEBUI_FRAME, (Function) webui_frame);
+  del_hook(HOOK_WEBUI_UNFRAME, (Function) webui_unframe);
+  return NULL;
+}
+
+EXPORT_SCOPE char *webui_start();
+
+static Function webui_table[] = {
+  (Function) webui_start,
+  (Function) webui_close,
+  NULL,
+  NULL,
+};
+
+//extern struct dcc_t *dcc;
+
+
+/*
+static void webui_ws_display(int idx, char *buf)
+{
+  if (!dcc[idx].ssl)
+    strcpy(buf, "webui ws");
+  else
+    strcpy(buf, "webui wss");
+}
+*/
+
+
+char *webui_start(Function *global_funcs)
+{
+#ifdef TLS
+  global = global_funcs;
+
+  module_register(MODULE_NAME, webui_table, 0, 9);
+
+  if (!module_depend(MODULE_NAME, "eggdrop", 109, 0)) {
+    module_undepend(MODULE_NAME);
+    return "This module requires Eggdrop 1.9.0 or later.";
+  }
+  if (!(server_funcs = module_depend(MODULE_NAME, "server", 1, 0))) {
+    module_undepend(MODULE_NAME);
+    return "This module requires server module 1.0 or later.";
+  }
+  add_hook(HOOK_DCC_TELNET_HOSTRESOLVED, (Function) webui_dcc_telnet_hostresolved);
+  add_hook(HOOK_WEBUI_FRAME, (Function) webui_frame);
+  add_hook(HOOK_WEBUI_UNFRAME, (Function) webui_unframe);
+  return NULL;
+#else
+  return "Initialization failure: configured with --disable-tls or openssl not found";
+#endif
+}

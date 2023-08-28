@@ -1,5 +1,5 @@
 Directory Contents - text/
-Last revised: February 17, 2023
+Last revised: December 02, 2003
     _____________________________________________________________________
 
                          Directory Contents - text/
@@ -12,8 +12,6 @@ Last revised: February 17, 2023
   motd
     The text of this file is displayed anytime a user successfully logs in and
     joins the party line.
-
-  webui.html
 
     _____________________________________________________________________
 

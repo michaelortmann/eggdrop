@@ -54,6 +54,9 @@ extern int (*rfc_ncasecmp) (const char *, const char *, int);
 extern int (*rfc_toupper) (int);
 extern int (*rfc_tolower) (int);
 extern int (*match_noterej) (struct userrec *, char *);
+extern void (*webui_dcc_telnet_hostresolved) (int);
+extern void (*webui_frame) (char **, unsigned int *);
+extern void (*webui_unframe) (char *, int *);
 #endif
 
 /* botcmd.c */
@@ -363,10 +366,5 @@ int _rfc_casecmp(const char *, const char *);
 int _rfc_ncasecmp(const char *, const char *, int);
 int _rfc_toupper(int);
 int _rfc_tolower(int);
-
-/* webui.c */
-/* TODO: size_t ? */
-void webui_frame(char **, unsigned int *);
-void webui_unframe(char **, int *);
 
 #endif /* _EGG_PROTO_H */

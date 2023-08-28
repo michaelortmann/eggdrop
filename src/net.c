@@ -970,7 +970,6 @@ int sockread(char *s, int *len, sock_list *slist, int slistmax, int tclonly)
       else
 #ifdef TLS
       {
-
         if (slist[i].ssl) {
           x = SSL_read(slist[i].ssl, s, grab);
           if (x < 0) {
@@ -1009,7 +1008,7 @@ int sockread(char *s, int *len, sock_list *slist, int slistmax, int tclonly)
       }
 #ifdef TLS
       if (socklist[i].flags & SOCK_WS)
-        webui_unframe(&s, &x);
+        webui_unframe(s, &x);
 #endif /* TLS */
       s[x] = 0;
       *len = x;

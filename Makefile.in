@@ -432,9 +432,6 @@ install-text: install-start
 	if test ! -f $(DEST)/text/banner; then \
 		$(INSTALL_DATA) $(srcdir)/text/banner $(DEST)/text/; \
 	fi
-	if test ! -f $(DEST)/text/webui.html; then \
-		$(INSTALL_DATA) $(srcdir)/text/webui.html $(DEST)/text/; \
-	fi
 
 install-help: install-start
 	+@echo "Copying help files." && \
