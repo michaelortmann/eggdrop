@@ -41,7 +41,7 @@
 #define WS_LEN      28 /* length of Sec-WebSocket-Accept header field value
                         * import math; (4 * math.ceil(20 / 3)) */
 
-static Function *global = NULL, *server_funcs = NULL;
+static Function *global = NULL;
 
 /* 0x15 = TLS ContentType alert
  * 0x0a = TLS Alert       unexpected_message
@@ -501,16 +501,10 @@ char *webui_start(Function *global_funcs)
 {
 #ifdef TLS
   global = global_funcs;
-
   module_register(MODULE_NAME, webui_table, 0, 9);
-
   if (!module_depend(MODULE_NAME, "eggdrop", 109, 0)) {
     module_undepend(MODULE_NAME);
     return "This module requires Eggdrop 1.9.0 or later.";
-  }
-  if (!(server_funcs = module_depend(MODULE_NAME, "server", 1, 0))) {
-    module_undepend(MODULE_NAME);
-    return "This module requires server module 1.0 or later.";
   }
   add_hook(HOOK_DCC_TELNET_HOSTRESOLVED, (Function) webui_dcc_telnet_hostresolved);
   add_hook(HOOK_WEBUI_FRAME, (Function) webui_frame);
