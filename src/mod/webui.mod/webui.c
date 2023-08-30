@@ -23,23 +23,20 @@
 
 #define MODULE_NAME "webui"
 
-#include <fcntl.h> /* open */
-#include <resolv.h> /* base64 encode b64_ntop() and base64 decode b64_pton() */
-#include <sys/mman.h> /* mmap */
-#include <sys/resource.h> /* getrusage */
-#include <sys/stat.h> /* fstat */
-#include <openssl/sha.h>
-#include "src/mod/module.h"
 #include <errno.h>
+#include <fcntl.h>
+#include <resolv.h> /* base64 encode b64_ntop() and base64 decode b64_pton() */
+#include <sys/mman.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
+#include <openssl/sha.h>
 #include "src/version.h"
-// #include main.h
+#include "src/mod/module.h"
 
-#define GET_INDEX   "GET / "
-#define GET_FAVICON "GET /favicon.ico "
-#define GET_W       "GET /w "
-#define WS_GUID     "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-#define WS_LEN      28 /* length of Sec-WebSocket-Accept header field value
-                        * import math; (4 * math.ceil(20 / 3)) */
+#define WS_GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+#define WS_LEN  28 /* length of Sec-WebSocket-Accept header field value
+                    * base64(len(sha1))
+                    * import math; (4 * math.ceil(20 / 3)) */
 
 static Function *global = NULL;
 
@@ -50,7 +47,6 @@ static uint8_t alert[] = {0x15, 0x03, 0x01, 0x00, 0x02, 0x02, 0x0a};
 
 /* wget https://www.eggheads.org/favicon.ico
  * xxd -i favicon.ico
- * TODO: discuss whether or not to inline favicon.ico
  */
 static unsigned char favicon_ico[] = {
   0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x24, 0x00, 0x24, 0x00, 0xf7, 0x00,
@@ -295,6 +291,7 @@ static void webui_http_activity(int idx, char *buf, int len)
 #endif
 
     char out[WS_LEN + 1];
+    /* TODO: remove assert / debug */
     if (b64_ntop(hash, sizeof hash, out, sizeof out) != WS_LEN) {
       putlog(LOG_MISC, "*", "WEBUI error: b64_ntop() != WS_LEN");
       return;
@@ -314,7 +311,7 @@ static void webui_http_activity(int idx, char *buf, int len)
 
     debug2("## REMOVE binary flag on socketlist_socket %i dcc_socket should be equal %li\n", socklist_i->sock, dcc[idx].sock);
     socklist_i->flags &= ~ SOCK_BINARY; /* TODO: maybe not the right place, but we need it for net.c sockgets() */
-    strcpy(dcc[idx].host, "*"); /* wichtig fuer spaeter dcc_telnet_id willd_match, aber ob das hier die richtige stelle ist, und noch was anderen fehlt?  TODO */
+    strcpy(dcc[idx].host, "*"); /* wichtig fuer spaeter dcc_telnet_id wild_match, aber ob das hier die richtige stelle ist, und noch was anderen fehlt?  TODO */
     /* das .host wird in change_to_dcc_telnet_id zo .nick */
     printf("SOCK_WS gesetzt fuer socklist %i idx %i sock %li status %lu\n", findsock(dcc[idx].sock), idx, dcc[idx].sock, dcc[idx].status);
 
@@ -357,9 +354,6 @@ static void webui_http_display(int idx, char *buf)
   else
     strcpy(buf, "webui https");
 }
-
-
-
 
 struct dcc_table DCC_WEBUI_HTTP = {
   "WEBUI_HTTP",
@@ -427,8 +421,6 @@ void webui_unframe(char *buf, int *len)
   debug1("webui: webui_unframe(): len %i", *len);
   if (*len < 6) { /* TODO: better len check */
 
-
-
     /* TODO: return error code ? */
     putlog(LOG_MISC, "*", "WEBUI error: someone sent something other than WebSocket protocol");
     /*
@@ -491,20 +483,6 @@ static Function webui_table[] = {
   NULL,
   NULL,
 };
-
-//extern struct dcc_t *dcc;
-
-
-/*
-static void webui_ws_display(int idx, char *buf)
-{
-  if (!dcc[idx].ssl)
-    strcpy(buf, "webui ws");
-  else
-    strcpy(buf, "webui wss");
-}
-*/
-
 
 char *webui_start(Function *global_funcs)
 {
