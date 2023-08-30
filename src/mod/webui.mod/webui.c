@@ -275,15 +275,24 @@ static void webui_http_activity(int idx, char *buf, int len)
         return;
       }
     debug2("webui: server requests websocket upgrade with key %.*s", KEYLEN, buf);
-    /* TODO: need to update that code to what
-     * https://github.com/eggheads/eggdrop/pull/1385/files does
-     */
-    SHA_CTX c;
+
     unsigned char hash[SHA_DIGEST_LENGTH];
+#if (OPENSSL_VERSION_NUMBER >= 0x10100000L)
+    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
+    const EVP_MD *md = EVP_sha1();
+    unsigned int md_len;
+    EVP_DigestInit_ex(mdctx, md, NULL);
+    EVP_DigestUpdate(mdctx, buf, KEYLEN);
+    EVP_DigestUpdate(mdctx, WS_GUID, (sizeof WS_GUID) - 1);
+    EVP_DigestFinal_ex(mdctx, hash, &md_len);
+    EVP_MD_CTX_free(mdctx);
+#else
+    SHA_CTX c;
     SHA1_Init(&c);
     SHA1_Update(&c, buf, KEYLEN);
     SHA1_Update(&c, WS_GUID, (sizeof WS_GUID) - 1);
     SHA1_Final(hash, &c);
+#endif
 
     char out[WS_LEN + 1];
     if (b64_ntop(hash, sizeof hash, out, sizeof out) != WS_LEN) {
