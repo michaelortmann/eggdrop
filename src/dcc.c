@@ -1271,6 +1271,8 @@ static void dcc_telnet(int idx, char *buf, int i)
     putlog(LOG_MISC, "*", DCC_FAILED, strerror(errno));
     return;
   }
+  /* Buffer data received on this socket.  */
+  sockoptions(sock, EGG_OPTION_SET, SOCK_BUFFER);
 
   if (port < 1024) {
     putlog(LOG_BOTS, "*", DCC_BADSRC, iptostr(&dcc[i].sockname.addr.sa), port);
@@ -2421,7 +2423,7 @@ static void dcc_telnet_got_ident(int i, char *host)
   }
   /* Do not buffer data anymore. All received and stored data is passed
    * over to the dcc functions from now on.  */
-  //sockoptions(dcc[i].sock, EGG_OPTION_UNSET, SOCK_BUFFER); */ war zuest hier, muss aber wwoanders, frueher? passieren, damit auch chrome funktioniert */
+  sockoptions(dcc[i].sock, EGG_OPTION_UNSET, SOCK_BUFFER);
   printf("dcc_telnet_got_ident()\n");
   printf("++ 1 %s %s %s %s %s %s\n", dcc[idx].type->name, dcc[idx].nick, dcc[idx].host, dcc[i].type->name, dcc[i].nick, dcc[i].host);
 #ifdef TLS

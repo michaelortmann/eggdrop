@@ -311,8 +311,8 @@ static void webui_http_activity(int idx, char *buf, int len)
 
     debug2("## REMOVE binary flag on socketlist_socket %i dcc_socket should be equal %li\n", socklist_i->sock, dcc[idx].sock);
     socklist_i->flags &= ~ SOCK_BINARY; /* TODO: maybe not the right place, but we need it for net.c sockgets() */
-    strcpy(dcc[idx].host, "*"); /* wichtig fuer spaeter dcc_telnet_id wild_match, aber ob das hier die richtige stelle ist, und noch was anderen fehlt?  TODO */
-    /* das .host wird in change_to_dcc_telnet_id zo .nick */
+    strcpy(dcc[idx].host, "*"); /* important for later dcc_telnet_id wild_match, aber ob das hier die richtige stelle ist, und noch was anderen fehlt?  TODO */
+    /* .host becomes .nick in change_to_dcc_telnet_id() */
     printf("SOCK_WS gesetzt fuer socklist %i idx %i sock %li status %lu\n", findsock(dcc[idx].sock), idx, dcc[idx].sock, dcc[idx].status);
 
     //changeover_dcc(idx, &DCC_WEBUI_WS, 0);
@@ -371,25 +371,18 @@ static struct dcc_table DCC_WEBUI_HTTP = {
 
 static void webui_dcc_telnet_hostresolved(int i)
 {
+    debug1("webui_dcc_telnet_hostresolved(%i)", i);
     changeover_dcc(i, &DCC_WEBUI_HTTP, 0);
     sockoptions(dcc[i].sock, EGG_OPTION_SET, SOCK_BINARY);
-
-    /* 20230217 23:50 muss fuer Chrome hier sein,
-     * denn der schickt w/ VOR dcc_telnet_hostresolved()
-     *
-     * das andere UNSET spaeter kann dann evtl raus?
-     */
-    sockoptions(dcc[i].sock, EGG_OPTION_UNSET, SOCK_BUFFER);
     dcc[i].u.other = NULL; /* important, else nfree() error in lostdcc on eof */
-    //strcpy(dcc[i].nick, "*");
-    //strlcpy(dcc[i].host, userhost, UHOSTLEN);
 }
 
 static void webui_frame(char **buf, unsigned int *len) {
   static uint8_t out[2048];
+
   /* no debug() or putlog() here or recursion */
-  //printf(">>>%s<<<", *buf);
   printf("webui: webui_frame() len %u\n", *len);
+  //printf(">>>%s<<<", *buf);
   out[0] = 0x81; /* FIN + text frame */
   /* A server MUST NOT mask any frames that it sends to the client */
   if (*len < 0x7e) {
