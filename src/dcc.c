@@ -1330,9 +1330,6 @@ void dcc_telnet_hostresolved2(int i, int idx) {
     return;
   }
 
-  //tell_dcc(3);
-  //fatal("hold my beer", 42);
-
   changeover_dcc(i, &DCC_IDENTWAIT, 0);
   dcc[i].timeval = now;
   dcc[i].u.ident_sock = dcc[idx].sock;
@@ -1362,10 +1359,6 @@ void dcc_telnet_hostresolved2(int i, int idx) {
       sock = dcc[j].sock;
     }
   }
-
-  //tell_dcc(3);
-  //printf("j %i\n", j);
-  //fatal("hold my beer", 42);
 
   if (j < 0) {
     dcc_telnet_got_ident(i, userhost);

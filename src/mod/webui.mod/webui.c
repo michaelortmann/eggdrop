@@ -390,8 +390,6 @@ static void webui_frame(char **buf, unsigned int *len) {
   /* no debug() or putlog() here or recursion */
   //printf(">>>%s<<<", *buf);
   printf("webui: webui_frame() len %u\n", *len);
-  //tell_dcc(3);
-  // fatal("hold my beer", 42);
   out[0] = 0x81; /* FIN + text frame */
   /* A server MUST NOT mask any frames that it sends to the client */
   if (*len < 0x7e) {
