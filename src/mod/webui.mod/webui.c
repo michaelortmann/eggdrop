@@ -355,7 +355,7 @@ static void webui_http_display(int idx, char *buf)
     strcpy(buf, "webui https");
 }
 
-struct dcc_table DCC_WEBUI_HTTP = {
+static struct dcc_table DCC_WEBUI_HTTP = {
   "WEBUI_HTTP",
   0,
   webui_http_eof,
@@ -369,7 +369,7 @@ struct dcc_table DCC_WEBUI_HTTP = {
   NULL
 };
 
-void webui_dcc_telnet_hostresolved(int i)
+static void webui_dcc_telnet_hostresolved(int i)
 {
     changeover_dcc(i, &DCC_WEBUI_HTTP, 0);
     sockoptions(dcc[i].sock, EGG_OPTION_SET, SOCK_BINARY);
@@ -385,7 +385,7 @@ void webui_dcc_telnet_hostresolved(int i)
     //strlcpy(dcc[i].host, userhost, UHOSTLEN);
 }
 
-void webui_frame(char **buf, unsigned int *len) {
+static void webui_frame(char **buf, unsigned int *len) {
   static uint8_t out[2048];
   /* no debug() or putlog() here or recursion */
   //printf(">>>%s<<<", *buf);
@@ -413,7 +413,7 @@ void webui_frame(char **buf, unsigned int *len) {
 }
 
 /* TODO: return error code ? */
-void webui_unframe(char *buf, int *len)
+static void webui_unframe(char *buf, int *len)
 {
   int i;
   uint8_t *key, *payload;
