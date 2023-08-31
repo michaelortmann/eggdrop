@@ -332,7 +332,6 @@ static void webui_http_activity(int idx, char *buf, int len)
     debug0("webui: 404");
   if (len == 511) {
     /* read probable remaining bytes */
-    
     SSL *ssl = socklist[findsock(dcc[idx].sock)].ssl;
     if (ssl)
       debug1("webui: SSL_read(): len %i", SSL_read(ssl, buf, 511));

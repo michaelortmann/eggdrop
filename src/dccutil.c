@@ -434,7 +434,6 @@ void tell_dcc(int zidx)
 #else
               ' ', dcc[i].port, dcc[i].nick, other);
 #endif
-    dprintf(zidx, "  %i %s status %lu ssl %i\n", i, dcc[i].type->name, dcc[i].status, dcc[i].ssl);
   }
 }
 
