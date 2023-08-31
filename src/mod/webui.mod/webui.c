@@ -307,25 +307,23 @@ static void webui_http_activity(int idx, char *buf, int len)
     sock_list* socklist_i = &socklist[findsock(dcc[idx].sock)];
     socklist_i->flags |= SOCK_WS;
 
-    debug2("## REMOVE binary flag on socketlist_socket %i dcc_socket should be equal %li\n", socklist_i->sock, dcc[idx].sock);
-    socklist_i->flags &= ~ SOCK_BINARY; /* TODO: maybe not the right place, but we need it for net.c sockgets() */
-    strcpy(dcc[idx].host, "*"); /* important for later dcc_telnet_id wild_match, aber ob das hier die richtige stelle ist, und noch was anderen fehlt?  TODO */
-    /* .host becomes .nick in change_to_dcc_telnet_id() */
-    printf("SOCK_WS gesetzt fuer socklist %i idx %i sock %li status %lu\n", findsock(dcc[idx].sock), idx, dcc[idx].sock, dcc[idx].status);
 
-    //changeover_dcc(idx, &DCC_WEBUI_WS, 0);
+    socklist_i->flags &= ~ SOCK_BINARY; /* we need it for net.c sockgets(), is there better place to do this? */
+    debug1("webui: unset flag SOCK_BINARY sock %li\n", dcc[idx].sock);
+    strcpy(dcc[idx].host, "*"); /* important for later dcc_telnet_id wild_match, is there better place to do this? */
+    /* .host becomes .nick in change_to_dcc_telnet_id() */
+    debug4("webui: set flag SOCK_WS socklist %i idx %i sock %li status %lu\n", findsock(dcc[idx].sock), idx, dcc[idx].sock, dcc[idx].status);
+
     dcc[idx].status |= STAT_USRONLY; /* magick */
-    //change_to_dcc_telnet_id(idx);
-    //extern int dcc_total;
     for (i = 0; i < dcc_total; i++) /* quick hack, we need to link from idx, dont we? */
       if (!strcmp(dcc[i].nick, "(webui)")) {
-        printf("FOUND !!\n");
+        debug0("webui: found (webui) dcc\n");
         break;
       }
     dcc[idx].u.other = NULL; /* fix ATTEMPTING TO FREE NON-MALLOC'D PTR: dccutil.c (561) */
     dcc_telnet_hostresolved2(idx, i);
 
-    printf("CHANGEOVER -> idx %i sock %li\n", idx, dcc[idx].sock);
+    debug2("webui: CHANGEOVER -> idx %i sock %li\n", idx, dcc[idx].sock);
   } else /* TODO: send 404 or something ? */
     debug0("webui: 404");
   if (len == 511) {
