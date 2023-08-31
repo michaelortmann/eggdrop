@@ -33,10 +33,12 @@
 #include "src/version.h"
 #include "src/mod/module.h"
 
-#define WS_GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-#define WS_LEN  28 /* length of Sec-WebSocket-Accept header field value
-                    * base64(len(sha1))
-                    * import math; (4 * math.ceil(20 / 3)) */
+#define WS_GUID   "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+#define WS_KEY    "Sec-WebSocket-Key:"
+#define WS_KEYLEN 24 /* key is padded, so its always 24 bytes */
+#define WS_LEN    28 /* length of Sec-WebSocket-Accept header field value
+                      * base64(len(sha1))
+                      * import math; (4 * math.ceil(20 / 3)) */
 
 static Function *global = NULL;
 
@@ -230,7 +232,6 @@ static void webui_http_activity(int idx, char *buf, int len)
     }
     i = snprintf(response, sizeof response,
       "HTTP/1.1 200 \r\n" /* textual phrase is OPTIONAL */
-      //"Connection: close\r\n" // or keep-alive, gross/kleinschreibung scheint egal
       "Content-Length: %li\r\n"
       "Server: Eggdrop/%s+%s\r\n"
       "\r\n%.*s", sb.st_size, EGG_STRINGVER, EGG_PATCH, (int) sb.st_size, body);
@@ -246,7 +247,7 @@ static void webui_http_activity(int idx, char *buf, int len)
       "HTTP/1.1 200 \r\n" /* textual phrase is OPTIONAL */
       "Content-Length: %li\r\n"
       "Content-Type: image/x-icon\r\n"
-      "Server: Eggdrop/%s+%s\r\n"
+      "Server: Eggdrop/%s+%s\r\n" /* TODO: stealth_telnets */
       "\r\n",
       sizeof favicon_ico, EGG_STRINGVER, EGG_PATCH);
     memcpy(response + i, favicon_ico, sizeof favicon_ico);
@@ -256,21 +257,18 @@ static void webui_http_activity(int idx, char *buf, int len)
     debug1("webui: tputs(): %i", i);
   } else if (buf[5] == 'w') {
     debug0("webui: GET /w");
-    #define KEYKEY "Sec-WebSocket-Key:"
-    buf = strstr(buf, KEYKEY);
+    buf = strstr(buf, WS_KEY);
     if (!buf) {
       putlog(LOG_MISC, "*", "WEBUI error: Sec-WebSocket-Key not found");
       return;
     }
-    buf += sizeof KEYKEY;
-    #define KEYLEN 24 /* key is padded, so its always 24 bytes */
-    for(i = 0; i < KEYLEN; i++)
+    buf += sizeof WS_KEY;
+    for(i = 0; i < WS_KEYLEN; i++)
       if (!buf[i]) {
-        /* buf is user input, dont putlog raw user input in production */
-        putlog(LOG_MISC, "*", "WEBUI error: bogus Sec-WebSocket-Key %.*s", KEYLEN, buf);
+        putlog(LOG_MISC, "*", "WEBUI error: Sec-WebSocket-Key too short");
         return;
       }
-    debug2("webui: server requests websocket upgrade with key %.*s", KEYLEN, buf);
+    debug0("webui: server requests websocket upgrade");
 
     unsigned char hash[SHA_DIGEST_LENGTH];
 #if (OPENSSL_VERSION_NUMBER >= 0x10100000L)
@@ -278,7 +276,7 @@ static void webui_http_activity(int idx, char *buf, int len)
     const EVP_MD *md = EVP_sha1();
     unsigned int md_len;
     EVP_DigestInit_ex(mdctx, md, NULL);
-    EVP_DigestUpdate(mdctx, buf, KEYLEN);
+    EVP_DigestUpdate(mdctx, buf, WS_KEYLEN);
     EVP_DigestUpdate(mdctx, WS_GUID, (sizeof WS_GUID) - 1);
     EVP_DigestFinal_ex(mdctx, hash, &md_len);
     EVP_MD_CTX_free(mdctx);
