@@ -929,21 +929,16 @@ int sockread(char *s, int *len, sock_list *slist, int slistmax, int tclonly)
              SELECT_TYPE_ARG5 &t);
   if (x == -1)
     return -2;                  /* socket error */
-  if (x == 0) {
 #ifdef TLS
-    if (!tclonly)
+  if ((x == 0) && !tclonly)
       for (i = 0; i < slistmax; i++)
         if (!(slist[i].flags & (SOCK_UNUSED | SOCK_TCL)) && slist[i].ssl && SSL_pending(slist[i].ssl)) {
-          putlog(LOG_MISC, "*", "DEBUG: SSL_pending(%i) = %i", i, SSL_pending(slist[i].ssl));
-          x = SSL_read(slist[i].ssl, s, grab);
-          putlog(LOG_MISC, "*", "DEBUG: SSL_read(%i) = %i / %i bytes", i, x,  grab);
-          s[x] = 0;
-          *len = x;
-          return i;
+          x = i;
+          break;
         }
 #endif
+  if (x == 0)
     return -3;                  /* idle */
-  }
 
   for (i = 0; i < slistmax; i++) {
     if (!tclonly && ((!(slist[i].flags & (SOCK_UNUSED | SOCK_TCL))) &&
