@@ -28,4 +28,4 @@
 
 #define EGG_STRINGVER "1.9.5"
 #define EGG_NUMVER 1090504
-#define EGG_PATCH "needtls"
+#define EGG_PATCH "experimental"

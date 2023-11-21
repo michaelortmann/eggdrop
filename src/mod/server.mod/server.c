@@ -206,6 +206,11 @@ static void deq_msg()
 
   /* Send up to 4 msgs to server if the *critical queue* has anything in it */
   if (modeq.head) {
+    if (trying_server) {
+      putlog(LOG_MISC, "*", "EXPERIMENTAL WORKAROUND: START OF MODE QUEUE DEQUEUING DELAYED");
+      return;
+    }
+
     while (modeq.head && (burst < 4) && ((last_time - now) < MAXPENALTY)) {
       if (deq_kick(DP_MODE)) {
         burst++;
