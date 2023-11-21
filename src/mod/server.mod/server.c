@@ -193,6 +193,7 @@ static void deq_msg()
   struct msgq *q;
   int ok = 0;
 
+  putlog(LOG_MISC, "*", "DEBUG: deq_msg()");
   /* now < last_time tested 'cause clock adjustments could mess it up */
   if ((now - last_time) >= msgrate || now < (last_time - 90)) {
     last_time = now;
@@ -206,10 +207,6 @@ static void deq_msg()
 
   /* Send up to 4 msgs to server if the *critical queue* has anything in it */
   if (modeq.head) {
-    if (trying_server) {
-      putlog(LOG_MISC, "*", "EXPERIMENTAL WORKAROUND: START OF MODE QUEUE DEQUEUING DELAYED");
-      return;
-    }
 
     while (modeq.head && (burst < 4) && ((last_time - now) < MAXPENALTY)) {
       if (deq_kick(DP_MODE)) {
