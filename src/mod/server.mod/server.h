@@ -154,15 +154,4 @@ enum {
   NETT_OTHER         /* Others                            */
 };
 
-/* Available sasl mechanisms. */
-enum {
-  SASL_MECHANISM_PLAIN,
-  SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE,
-  SASL_MECHANISM_EXTERNAL,
-  SASL_MECHANISM_NUM
-};
-
-/* Must be extern to avoid odr-violation and allow make static */
-extern char const *SASL_MECHANISMS[];
-
 #endif /* _EGG_MOD_SERVER_SERVER_H */
