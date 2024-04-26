@@ -161,7 +161,9 @@ static int burst;
 char const *SASL_MECHANISMS[SASL_MECHANISM_NUM] = {
   [SASL_MECHANISM_PLAIN]                    = "PLAIN",
   [SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE] = "ECDSA-NIST256P-CHALLENGE",
-  [SASL_MECHANISM_EXTERNAL]                 = "EXTERNAL"
+  [SASL_MECHANISM_EXTERNAL]                 = "EXTERNAL",
+  [SASL_MECHANISM_SCRAM_SHA_256]            = "SCRAM-SHA-256",
+  [SASL_MECHANISM_SCRAM_SHA_512]            = "SCRAM-SHA-512",
 };
 
 static void write_to_server(char *s, unsigned int len) {
