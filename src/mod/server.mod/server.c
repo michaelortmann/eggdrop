@@ -1415,7 +1415,7 @@ static int server_raw STDVAR
 
 static int server_rawt STDVAR
 {
-  int unused;
+  Tcl_Size unused;
   Tcl_Obj *tagdict;
   Function F = (Function) cd;
 
@@ -1811,7 +1811,8 @@ static char *tcl_eggserver(ClientData cdata, Tcl_Interp *irp,
                            EGG_CONST char *name1,
                            EGG_CONST char *name2, int flags)
 {
-  int lc, code, i;
+  Tcl_Size lc, i;
+  int code;
   char x[1024];
   EGG_CONST char **list, *slist;
   struct server_list *q;
