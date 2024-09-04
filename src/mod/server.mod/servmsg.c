@@ -1364,6 +1364,10 @@ static int tryauthenticate(char *from, char *msg)
     s = src;
     /* Don't use snprintf due to \0 inside */
     if (sasl_mechanism == SASL_MECHANISM_PLAIN) {
+      if (!*sasl_username) {
+        putlog(LOG_DEBUG, "*", "SASL: sasl-username not set, setting it to username %s", botname);
+        strlcpy(sasl_username, botuser, sizeof sasl_username);
+      }
       strcpy(s, sasl_username);
       s += strlen(sasl_username) + 1;
       strcpy(s, sasl_username);
@@ -1373,7 +1377,7 @@ static int tryauthenticate(char *from, char *msg)
       dst[0] = 0;
       if (b64_ntop((unsigned char *) src, s - src, (char *) dst, sizeof dst) == -1) {
         putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: could not base64 "
-                    "encode");
+               "encode");
         /* TODO: send cap end for all error cases in this function ? */
         return 1;
       }
@@ -1387,7 +1391,7 @@ static int tryauthenticate(char *from, char *msg)
       s += strlen(sasl_username);
       if (b64_ntop((unsigned char *) src, s - src, (char *) dst, sizeof dst) == -1) {
         putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: could not base64 "
-                "encode");
+               "encode");
         return 1;
       }
     }
@@ -1417,19 +1421,19 @@ static int tryauthenticate(char *from, char *msg)
     olen = b64_pton(msg, dst, sizeof dst);
     if (olen == -1) {
       putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: could not base64 decode "
-                "line from server");
+             "line from server");
       return 1;
     }
     fp = fopen(sasl_ecdsa_key, "r");
     if (!fp) {
       putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: could not open file "
-                "sasl_ecdsa_key %s: %s\n", sasl_ecdsa_key, strerror(errno));
+             "sasl_ecdsa_key %s: %s\n", sasl_ecdsa_key, strerror(errno));
       return 1;
     }
     pkey = PEM_read_PrivateKey(fp, NULL, 0, NULL);
     if (!pkey) {
       putlog(LOG_SERV, "*", "SASL: AUTHENTICATE: PEM_read_PrivateKey(): SSL "
-                "error = %s\n", ERR_error_string(ERR_get_error(), 0));
+             "error = %s\n", ERR_error_string(ERR_get_error(), 0));
       fclose(fp);
       return 1;
     }
@@ -1907,17 +1911,23 @@ static int gotcap(char *from, char *msg) {
 
           if ((sasl) && (!strcasecmp(current->name, "sasl")) && (current->enabled)) {
             putlog(LOG_DEBUG, "*", "SASL: Starting authentication process");
+	    if ((sasl_mechanism < 0) || (sasl_mechanism > 4)) {
+              snprintf(buf, sizeof buf,
+                       "authentication mechanism %i not supported",
+                       sasl_mechanism);
+              return sasl_error(buf);
+	    }
             if (current->value && !checkvalue(current->value, SASL_MECHANISMS[sasl_mechanism])) {
               snprintf(buf, sizeof buf,
-                  "%s authentication method not supported",
-                  SASL_MECHANISMS[sasl_mechanism]);
+                       "authentication mechanism %s not supported by server",
+                       SASL_MECHANISMS[sasl_mechanism]); /* TODO: report server supported mechanisms */
               return sasl_error(buf);
             }
 #ifndef HAVE_EVP_PKEY_GET1_EC_KEY
             if (sasl_mechanism != SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE) {
 #endif
               putlog(LOG_DEBUG, "*", "SASL: AUTHENTICATE %s",
-                  SASL_MECHANISMS[sasl_mechanism]);
+                     SASL_MECHANISMS[sasl_mechanism]);
               dprintf(DP_MODE, "AUTHENTICATE %s\n", SASL_MECHANISMS[sasl_mechanism]);
               sasl_timeout_time = sasl_timeout;
 #ifndef HAVE_EVP_PKEY_GET1_EC_KEY
