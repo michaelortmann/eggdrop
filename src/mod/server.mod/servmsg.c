@@ -1397,21 +1397,27 @@ static int tryauthenticate(char *from, char *msg)
     }
 #else
       putlog(LOG_DEBUG, "*", "SASL: TLS libs not present or missing EC support."
-                " Try the PLAIN, EXTERNAL or SCRAM method instead");
+             " Try the PLAIN, EXTERNAL or SCRAM method instead");
       return 1;
     }
 #endif
-    else {          /* sasl_mechanism == SASL_MECHANISM_EXTERNAL */
+    else if (sasl_mechanism == SASL_MECHANISM_EXTERNAL) {
 #ifdef TLS          /* TLS required for EXTERNAL sasl */
       dst[0] = '+';
       dst[1] = 0;
     }
 #else
       putlog(LOG_DEBUG, "*", "SASL: TLS libs required for EXTERNAL but are not "
-            "installed, try PLAIN method");
+             "installed, try PLAIN method");
       return 1;
     }
 #endif /* TLS */
+    else if (sasl_mechanism == SASL_MECHANISM_SCRAM_SHA_256) {
+      printf("scram-sha-256 not implemented yet\n"); /* TODO */
+    }
+    else if (sasl_mechanism == SASL_MECHANISM_SCRAM_SHA_512) {
+      printf("scram-sha-512 not implemented yet\n"); /* TODO */
+    }
     putlog(LOG_DEBUG, "*", "SASL: put AUTHENTICATE %s", dst);
     dprintf(DP_MODE, "AUTHENTICATE %s\n", dst);
   } else {      /* Only EC-challenges get extra auth messages w/o a + */
