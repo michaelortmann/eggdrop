@@ -42,6 +42,12 @@ static char const *SASL_MECHANISMS[SASL_MECHANISM_NUM] = {
   [SASL_MECHANISM_SCRAM_SHA_512]            = "SCRAM-SHA-512",
 };
 
+char nonce[21]; /* atheme defines acceptable client nonce len min 8 max 512 chars
+                 * nonce 128 bit = math.ceil(128 / math.log(93, 2)) = 20 chars
+                 * 3 major irc clients and postgres use 18, looks like ripping is still a thing ;)
+                 */
+char client_first_message[1024]; /* TODO: size ? */
+
 static void sasl_error(const char *msg)
 {
   putlog(LOG_SERV, "*", "SASL: %s", msg);
@@ -110,6 +116,48 @@ static int got908(char *from, char *msg)
   return 0;
 }
 
+static void sasl_plain(char *s) {
+  /* Don't use snprintf due to \0 inside */
+  strcpy(s, sasl_username);
+  s += strlen(sasl_username) + 1;
+  strcpy(s, sasl_username);
+  s += strlen(sasl_username) + 1;
+  strcpy(s, sasl_password);
+  s += strlen(sasl_password);
+}
+
+static void sasl_ecdsa_nist256p_challange(char *s) {
+#ifdef HAVE_EVP_PKEY_GET1_EC_KEY
+  strcpy(s, sasl_username);
+  s += strlen(sasl_username) + 1;
+  strcpy(s, sasl_username);
+  s += strlen(sasl_username);
+#else
+  sasl_error("TLS libs not present or missing EC support. Try the PLAIN, "
+             "EXTERNAL or SCRAM method instead");
+#endif /* HAVE_EVP_PKEY_GET1_EC_KEY */
+}
+
+static void sasl_external(char *dst) {
+#ifdef TLS /* TLS required for EXTERNAL sasl */
+  dst[0] = '+';
+  dst[1] = 0;
+#else
+  sasl_error("TLS libs required for EXTERNAL but are not installed, try PLAIN"
+             " method");
+#endif /* TLS */
+}
+
+static void sasl_scram(int *client_first_message_len) {
+  /* RFC 5802 - printable ASCII characters excluding ',' - printable = %x21-2B / %x2D-7E */
+  #define CHARSET_SCRAM "\x21\x22\x23\x24\x25\x26\x27\x28\x29\x2a\x2b\x2d\x2e\x2f\x30\x31\x32\x33\x34\x35\x36\x37\x38\x39\x3a\x3b\x3c\x3d\x3e\x3f\x40\x41\x42\x43\x44\x45\x46\x47\x48\x49\x4a\x4b\x4c\x4d\x4e\x4f\x50\x51\x52\x53\x54\x55\x56\x57\x58\x59\x5a\x5b\x5c\x5d\x5e\x5f\x60\x61\x62\x63\x64\x65\x66\x67\x68\x69\x6a\x6b\x6c\x6d\x6e\x6f\x70\x71\x72\x73\x74\x75\x76\x77\x78\x79\x7a\x7b\x7c\x7d\x7e"
+  make_rand_str_from_chars(nonce, (sizeof nonce) - 1, CHARSET_SCRAM); /* TODO: after sasl scram we should make this func return unbiased / uniformed randoms */
+  nonce[(sizeof nonce) - 1] = 0;
+  
+  *client_first_message_len = snprintf(client_first_message, sizeof client_first_message, "n,,n=%s,r=%s", sasl_username, nonce);
+  printf("DEBUG: src = >>>%s<<<\n", client_first_message);
+}
+
 /* TODO: state machine, modularize, handle final server msg for scram,
  * sasl-password should be sasl-password-file so we read the pass from file
  * and keep it only in memory while we need it,
@@ -146,13 +194,7 @@ static int authenticate(char *from, char *msg)
   unsigned int siglen;
 #endif /* OPENSSL_VERSION_NUMBER >= 0x10000000L */
 #endif /* HAVE_EVP_PKEY_GET1_EC_KEY */
-  static char nonce[21]; /* atheme defines acceptable client nonce len min 8 max 512 chars
-                          * nonce 128 bit = math.ceil(128 / math.log(93, 2)) = 20 chars
-                          * 3 major irc clients and postgres use 18, looks like ripping is still a thing ;)
-                          */
   size_t srclen;
-  static char client_first_message[1024]; /* TODO: size ? */
-  int client_first_message_len;
   char server_first_message[1024]; /* TODO: size ? */
   int server_first_message_len;
   putlog(LOG_DEBUG, "*", "SASL: got AUTHENTICATE %s", msg);
@@ -161,74 +203,52 @@ static int authenticate(char *from, char *msg)
     if (!*sasl_username) {
       putlog(LOG_DEBUG, "*",
              "SASL: sasl-username not set, setting it to username %s",
-             botname);
+botname);
       strlcpy(sasl_username, botuser, sizeof sasl_username);
     }
-    /* Don't use snprintf due to \0 inside */
-    if (sasl_mechanism == SASL_MECHANISM_PLAIN) {
-      strcpy(s, sasl_username);
-      s += strlen(sasl_username) + 1;
-      strcpy(s, sasl_username);
-      s += strlen(sasl_username) + 1;
-      strcpy(s, sasl_password);
-      s += strlen(sasl_password);
-      dst[0] = 0;
-      if (b64_ntop((unsigned char *) src, s - src, dst, sizeof dst) == -1) {
-        putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: could not base64 "
-               "encode");
+    switch (sasl_mechanism) {
+      case SASL_MECHANISM_PLAIN:
+        sasl_plain(s);
+        dst[0] = 0;
+        if (b64_ntop((unsigned char *) src, s - src, dst, sizeof dst) == -1)
+          putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: could not base64 "
+                 "encode");
         /* TODO: send cap end for all error cases in this function ? */
-        return 1;
-      }
-      /* TODO: what about olen we used for mbedtls_base64_encode() ? */
+        /* TODO: what about olen we used for mbedtls_base64_encode() ? */
+        break;
+      case SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE:
+	sasl_ecdsa_nist256p_challange(s);
+        dst[0] = 0;
+        if (b64_ntop((unsigned char *) src, s - src, dst, sizeof dst) == -1)
+          putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: could not base64 "
+                 "encode");
+        break;
+      case SASL_MECHANISM_EXTERNAL:
+        dst[0] = 0;
+        sasl_external(dst);
+	return 1;
+      case SASL_MECHANISM_SCRAM_SHA_256:
+      case SASL_MECHANISM_SCRAM_SHA_512:
+	int client_first_message_len;
+	sasl_scram(&client_first_message_len);
+	/* alle diese funktionen  sollten die laenge zurueckgeben die base64 dann jicht mitr strlen erneut suchen muss */
+        if (b64_ntop((unsigned char *) src, client_first_message_len, dst, sizeof dst) == -1)
+          sasl_error("SASL: AUTHENTICATE error: could not base64 encode");
+        putlog(LOG_DEBUG, "*", "SASL: put AUTHENTICATE %s", dst);
+        dprintf(DP_MODE, "AUTHENTICATE %s\n", dst);
+	break;
     }
-    else if (sasl_mechanism == SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE) {
-#ifdef HAVE_EVP_PKEY_GET1_EC_KEY
-      strcpy(s, sasl_username);
-      s += strlen(sasl_username) + 1;
-      strcpy(s, sasl_username);
-      s += strlen(sasl_username);
-      if (b64_ntop((unsigned char *) src, s - src, dst, sizeof dst) == -1) {
-        putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: could not base64 "
-               "encode");
-        return 1;
-      }
-    }
-#else
-      putlog(LOG_DEBUG, "*", "SASL: TLS libs not present or missing EC support."
-             " Try the PLAIN, EXTERNAL or SCRAM method instead");
-      return 1;
-    }
-#endif
-    else if (sasl_mechanism == SASL_MECHANISM_EXTERNAL) {
-#ifdef TLS /* TLS required for EXTERNAL sasl */
-      dst[0] = '+';
-      dst[1] = 0;
-    }
-#else
-      putlog(LOG_DEBUG, "*", "SASL: TLS libs required for EXTERNAL but are not "
-             "installed, try PLAIN method");
-      return 1;
-    }
-#endif /* TLS */
-    else if ((sasl_mechanism == SASL_MECHANISM_SCRAM_SHA_256) || (sasl_mechanism == SASL_MECHANISM_SCRAM_SHA_512)) {
-     /* RFC 5802 - printable ASCII characters excluding ',' - printable = %x21-2B / %x2D-7E */
-     #define CHARSET_SCRAM "\x21\x22\x23\x24\x25\x26\x27\x28\x29\x2a\x2b\x2d\x2e\x2f\x30\x31\x32\x33\x34\x35\x36\x37\x38\x39\x3a\x3b\x3c\x3d\x3e\x3f\x40\x41\x42\x43\x44\x45\x46\x47\x48\x49\x4a\x4b\x4c\x4d\x4e\x4f\x50\x51\x52\x53\x54\x55\x56\x57\x58\x59\x5a\x5b\x5c\x5d\x5e\x5f\x60\x61\x62\x63\x64\x65\x66\x67\x68\x69\x6a\x6b\x6c\x6d\x6e\x6f\x70\x71\x72\x73\x74\x75\x76\x77\x78\x79\x7a\x7b\x7c\x7d\x7e"
-      make_rand_str_from_chars(nonce, (sizeof nonce) - 1, CHARSET_SCRAM); /* TODO: after sasl scram we should make this func return unbiased / uniformed randoms */
-      nonce[(sizeof nonce) - 1] = 0;
-  
-      client_first_message_len = snprintf(client_first_message, sizeof client_first_message, "n,,n=%s,r=%s", sasl_username, nonce);
-      printf("DEBUG: src = >>>%s<<<\n", client_first_message);
-      if (b64_ntop((unsigned char *) client_first_message, client_first_message_len, dst, sizeof dst) == -1) {
-        putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: could not base64 encode");
-        return 1;
-      }
-    }
-    printf("src %s dst %s\n", client_first_message, dst);
-    putlog(LOG_DEBUG, "*", "SASL: put AUTHENTICATE %s", dst);
-    dprintf(DP_MODE, "AUTHENTICATE %s\n", dst);
-  } else {      /* Only EC-challenges get extra auth messages w/o a + */
-#ifdef TLS
+  } else {
+// TODO: state machine for sasl scram
     putlog(LOG_DEBUG, "*", "SASL: got AUTHENTICATE Challenge");
+
+
+
+
+
+   // if (sasl_mechanism == SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE) {
+   if ((sasl_mechanism == SASL_MECHANISM_SCRAM_SHA_256) || (sasl_mechanism == SASL_MECHANISM_SCRAM_SHA_512)) {
+
     if ((server_first_message_len = b64_pton(msg, (unsigned char*) server_first_message, sizeof server_first_message)) == -1) {
       putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: could not base64 decode "
              "line from server");
@@ -416,6 +436,7 @@ static int authenticate(char *from, char *msg)
       putlog(LOG_DEBUG, "*", "SASL: put AUTHENTICATE %s", dst);
       dprintf(DP_MODE, "AUTHENTICATE %s\n", dst);
     }
+   } else {
 #ifdef HAVE_EVP_PKEY_GET1_EC_KEY
     fp = fopen(sasl_ecdsa_key, "r");
     if (!fp) {
@@ -500,11 +521,10 @@ static int authenticate(char *from, char *msg)
     putlog(LOG_DEBUG, "*", "SASL: put AUTHENTICATE Response %s", dst);
     dprintf(DP_MODE, "AUTHENTICATE %s\n", dst);
 #endif /* HAVE_EVP_PKEY_GET1_EC_KEY */
-#else /* TLS */
     putlog(LOG_SERV, "*", "SASL: Received EC message, but no TLS EC libs "
            "present. Try PLAIN method");
     return 1;
-#endif /* TLS */
+    }
   }
   return 0;
 }
