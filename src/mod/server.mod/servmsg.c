@@ -1648,9 +1648,9 @@ static int gotcap(char *from, char *msg) {
             current->enabled = 0;
           } else {
             current->enabled = 1;
-            if (sasl && (!strcasecmp(current->name, "sasl")))
-              if (sasl_authenticate_initial(current->value))
-                return 1;
+            if (sasl && !strcasecmp(current->name, "sasl") &&
+                sasl_authenticate_initial(current->value))
+              return 1;
           }
         }
         current = current->next;
