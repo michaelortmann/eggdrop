@@ -116,14 +116,13 @@ static int got908(char *from, char *msg)
   return 0;
 }
 
-static void sasl_plain(char *s) {
-  /* Don't use snprintf due to \0 inside */
-  strcpy(s, sasl_username);
-  s += strlen(sasl_username) + 1;
-  strcpy(s, sasl_username);
-  s += strlen(sasl_username) + 1;
-  strcpy(s, sasl_password);
-  s += strlen(sasl_password);
+static int sasl_plain(char *client_msg_plain) {
+  /* Don't use snprintf() due to \0 inside */
+  char *s = client_msg_plain;
+  s = stpcpy(s, sasl_username) + 1;
+  s = stpcpy(s, sasl_username) + 1;
+  s = stpcpy(s, sasl_password);
+  return s - client_msg_plain;
 }
 
 static void sasl_ecdsa_nist256p_challange(char *s) {
@@ -158,64 +157,92 @@ static void sasl_scram(int *client_first_message_len) {
   printf("DEBUG: src = >>>%s<<<\n", client_first_message);
 }
 
-/* TODO: state machine, modularize, handle final server msg for scram,
- * sasl-password should be sasl-password-file so we read the pass from file
- * and keep it only in memory while we need it,
- * we could also enable/disable all sasl raw bindings to minimize attack
- * surface, in the end, fuzzing would be nice, coze we do a lot of parsing
- * here and cleanup, also server_iter and rusage should be displayed for the
- * function calling pbkdf2(server_iter)
- *
- * cache the client_key (assuming the Salt and hash iteration-count is stable)
- *
- * support authenticate split, like:
- * https://github.com/ircv3/ircv3-specifications/commit/838ef397385065bbc5c29d934bbb407e5b5a5ce5
+/* TODO:
+ *   modularize
+ *     this function is currently 36 lines long
+ *     aim is final version <= 70 lines
+ *   state machine, at least for scram
+ *   handle final server msg for scram, not implemented yet
+ *   sasl-password should be sasl-password-file so we read the pass from file
+ *     and keep it only in memory while we need it,
+ *   we could also enable/disable all sasl raw bindings to minimize attack
+ *   surface
+ *   in the end, fuzzing would be nice, coze we do a lot of parsing here
+ *   server_iter and rusage should be displayed for the function calling
+ *   pbkdf2(server_iter)
+ *   cache the client_key (assuming the Salt and hash iteration-count is stable)
+ *   support authenticate split by 400 byte, like:
+ *     https://github.com/ircv3/ircv3-specifications/commit/838ef397385065bbc5c29d934bbb407e5b5a5ce5
+ *     400-byte chunk, see: https://ircv3.net/specs/extensions/sasl-3.1.html
+ *       base64 padding
+ *     The response is encoded in Base64 (RFC 4648), then split to
+ *       400-byte chunks, and each chunk is sent as a separate AUTHENTICATE
+ *       command.
  */
-static int authenticate(char *from, char *msg)
+static int gotauthenticate(char *from, char *msg)
 {
-  char src[1024];
-  char *s;
-  /* 400-byte chunk, see: https://ircv3.net/specs/extensions/sasl-3.1.html
-   * base64 padding */
+  char client_msg_plain[1024];
+  size_t client_msg_plain_len;
   #ifndef MAX
-    #define MAX(a,b) (((a)>(b))?(a):(b))
+  #define MAX(a,b) (((a)>(b))?(a):(b))
   #endif
-  char dst[((MAX((sizeof src), 400) + 2) / 3) << 2] = "";
-#ifdef HAVE_EVP_PKEY_GET1_EC_KEY
-  FILE *fp;
-  EVP_PKEY *pkey;
-  unsigned char *sig;
-#if OPENSSL_VERSION_NUMBER >= 0x10000000L /* 1.0.0 */
-  EVP_PKEY_CTX *ctx;
-  size_t siglen;
-#else
-  EC_KEY *eckey;
-  int ret;
-  unsigned int siglen;
-#endif /* OPENSSL_VERSION_NUMBER >= 0x10000000L */
-#endif /* HAVE_EVP_PKEY_GET1_EC_KEY */
-  size_t srclen;
-  char server_first_message[1024]; /* TODO: size ? */
-  int server_first_message_len;
+  char client_msg_b64[((MAX((sizeof client_msg_plain), 400) + 2) / 3) << 2] = "";
+
   putlog(LOG_DEBUG, "*", "SASL: got AUTHENTICATE %s", msg);
+  fixcolon(msg); /* Because Inspircd does its own thing */
   if (msg[0] == '+') {
-    s = src;
     if (!*sasl_username) {
-      putlog(LOG_DEBUG, "*",
+      putlog(LOG_SERV, "*",
              "SASL: sasl-username not set, setting it to username %s",
 botname);
       strlcpy(sasl_username, botuser, sizeof sasl_username);
     }
     switch (sasl_mechanism) {
       case SASL_MECHANISM_PLAIN:
-        sasl_plain(s);
-        dst[0] = 0;
-        if (b64_ntop((unsigned char *) src, s - src, dst, sizeof dst) == -1)
-          putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: could not base64 "
-                 "encode");
-        /* TODO: send cap end for all error cases in this function ? */
-        /* TODO: what about olen we used for mbedtls_base64_encode() ? */
+        client_msg_plain_len = sasl_plain(client_msg_plain);
         break;
+      case SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE:
+      case SASL_MECHANISM_EXTERNAL:
+      case SASL_MECHANISM_SCRAM_SHA_256:
+      case SASL_MECHANISM_SCRAM_SHA_512:
+    }
+  } else {
+  }
+  if (b64_ntop((unsigned char *) client_msg_plain, client_msg_plain_len, client_msg_b64, sizeof client_msg_b64) == -1) {
+    sasl_error("AUTHENTICATE: could not base64 encode");
+    return 1;
+  }
+  putlog(LOG_DEBUG, "*", "SASL: put AUTHENTICATE Response %s", client_msg_b64);
+  dprintf(DP_MODE, "AUTHENTICATE %s\n", client_msg_b64);
+  return 0;
+}
+
+/* TODO: remove after gotauthenticate() is done
+static int authenticate_old(char *from, char *msg)
+{
+
+
+
+	
+#ifdef HAVE_EVP_PKEY_GET1_EC_KEY
+  FILE *fp;
+  EVP_PKEY *pkey;
+  unsigned char *sig;
+#if OPENSSL_VERSION_NUMBER >= 0x10000000L /* 1.0.0
+  EVP_PKEY_CTX *ctx;
+  size_t siglen;
+#else
+  EC_KEY *eckey;
+  int ret;
+  unsigned int siglen;
+#endif /* OPENSSL_VERSION_NUMBER >= 0x10000000L
+#endif /* HAVE_EVP_PKEY_GET1_EC_KEY
+
+  size_t srclen;
+  char server_first_message[1024]; /* TODO: size ?
+/*
+  int server_first_message_len;
+
       case SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE:
 	sasl_ecdsa_nist256p_challange(s);
         dst[0] = 0;
@@ -231,7 +258,7 @@ botname);
       case SASL_MECHANISM_SCRAM_SHA_512:
 	int client_first_message_len;
 	sasl_scram(&client_first_message_len);
-	/* alle diese funktionen  sollten die laenge zurueckgeben die base64 dann jicht mitr strlen erneut suchen muss */
+	/* alle diese funktionen  sollten die laenge zurueckgeben die base64 dann jicht mitr strlen erneut suchen muss
         if (b64_ntop((unsigned char *) src, client_first_message_len, dst, sizeof dst) == -1)
           sasl_error("SASL: AUTHENTICATE error: could not base64 encode");
         putlog(LOG_DEBUG, "*", "SASL: put AUTHENTICATE %s", dst);
@@ -268,7 +295,7 @@ botname);
         switch (*word) {
           case 'r':
             if (
-#if OPENSSL_VERSION_NUMBER >= 0x1010008fL /* 1.1.0h */
+#if OPENSSL_VERSION_NUMBER >= 0x1010008fL /* 1.1.0h
                 CRYPTO_memcmp
 #else
                 memcmp
@@ -320,7 +347,7 @@ botname);
        * Eggdrop doesnt have support for utf8 normalization yet
        * tcl also doesnt have it in core yet, only in tcllib 
        * We could use glib or something
-       */
+       
 
 
       char *salt[1024];
@@ -341,7 +368,7 @@ botname);
       int digestlen = EVP_MD_size(digest);
 
       char salted_password[EVP_MAX_MD_SIZE];
-      /* TODO: print time spent for pbkdf2 func */
+      /* TODO: print time spent for pbkdf2 func
       if (!PKCS5_PBKDF2_HMAC(sasl_password, strlen(sasl_password), (const unsigned char*) salt, salt_len, iter, digest, digestlen, (unsigned char *) salted_password)) {
         putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: PKCS5_PBKDF2_HMAC(): %s", ERR_error_string(ERR_get_error(), NULL));
         return 1;
@@ -349,7 +376,7 @@ botname);
 
       printf("DEBUG: salted_password ready\n");
 
-      /* ClientKey       := HMAC(SaltedPassword, "Client Key") */
+      /* ClientKey       := HMAC(SaltedPassword, "Client Key")
 
       unsigned char client_key[EVP_MAX_MD_SIZE];
       unsigned int client_key_len;
@@ -361,7 +388,7 @@ botname);
 
       printf("DEBUG: client_key ready\n");
 
-      /* StoredKey       := H(ClientKey) */
+      /* StoredKey       := H(ClientKey)
 
       unsigned char stored_key[EVP_MAX_MD_SIZE];
       unsigned int stored_key_len;
@@ -374,12 +401,10 @@ botname);
 
 
 
-
-
       /* AuthMessage     := client-first-message-bare + "," +
        *                    server-first-message + "," +
        *                    client-final-message-without-proof
-       */
+       *
 
       char client_final_message_without_proof[1024];
       snprintf(client_final_message_without_proof, sizeof client_final_message_without_proof, "c=biws,r=%s", server_nonce);
@@ -389,12 +414,12 @@ botname);
       printf("DEBUG: client_final_message_without_proof = >>>%s<<<\n", client_final_message_without_proof);
 
       printf("DEBUG: client_first_message = >>>%s<<<\n", client_first_message);
-      char auth_message[1024]; /* TODO: size */
+      char auth_message[1024]; /* TODO: size
       int auth_message_len = snprintf(auth_message, sizeof auth_message, "%s,%s,%s", client_first_message + 3, server_first_message, client_final_message_without_proof);
 
       printf("DEBUG: auth_message ready: >>>%s<<<\n", auth_message);
 
-      /* ClientSignature := HMAC(StoredKey, AuthMessage) */
+      /* ClientSignature := HMAC(StoredKey, AuthMessage)
       unsigned char client_signature[EVP_MAX_MD_SIZE];
       printf("DEBUG: digestlen: %i auth_message_len: %i\n", digestlen, auth_message_len);
       if (!HMAC(digest, (unsigned char *) stored_key, digestlen, (unsigned char *) auth_message, auth_message_len, client_signature, NULL)) {
@@ -404,7 +429,7 @@ botname);
 
       printf("DEBUG: client_signature ready\n");
 
-      /* ClientProof     := ClientKey XOR ClientSignature */
+      /* ClientProof     := ClientKey XOR ClientSignature
 
       unsigned char client_proof[EVP_MAX_MD_SIZE];
       printf("DEBUG: client_key_len: %i\n", client_key_len);
@@ -454,7 +479,7 @@ botname);
     fclose(fp);
 #if OPENSSL_VERSION_NUMBER >= 0x10000000L /* 1.0.0 */
     /* The EVP interface to digital signatures should almost always be used in
-     * preference to the low level interfaces. */
+     * preference to the low level interfaces.
     if (!(ctx = EVP_PKEY_CTX_new(pkey, NULL))) {
       putlog(LOG_SERV, "*", "SASL: AUTHENTICATE: EVP_PKEY_CTX_new(): SSL error = %s\n",
              ERR_error_string(ERR_get_error(), 0));
@@ -478,7 +503,7 @@ botname);
      * because EVP_PKEY_sign() does not hash the data to be signed.
      * EVP_PKEY_sign() is for signing digests, EVP_DigestSign*() and EVP_Sign*()
      * are for signing messages.
-     */
+     *
     if (EVP_PKEY_sign(ctx, NULL, &siglen, (unsigned char*) dst, server_first_message_len) <= 0) {
       putlog(LOG_SERV, "*", "SASL: AUTHENTICATE: EVP_PKEY_sign(): SSL error = %s\n",
              ERR_error_string(ERR_get_error(), 0));
@@ -511,16 +536,15 @@ botname);
       nfree(sig);
       return 1;
     } 
-#endif /* OPENSSL_VERSION_NUMBER >= 0x10000000L */
+#endif /* OPENSSL_VERSION_NUMBER >= 0x10000000L
     if (b64_ntop(sig, siglen, dst, sizeof dst) == -1) {
       putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: could not base64 encode");
       nfree(sig);
       return 1;
     }
     nfree(sig);
-    putlog(LOG_DEBUG, "*", "SASL: put AUTHENTICATE Response %s", dst);
-    dprintf(DP_MODE, "AUTHENTICATE %s\n", dst);
-#endif /* HAVE_EVP_PKEY_GET1_EC_KEY */
+    
+#endif /* HAVE_EVP_PKEY_GET1_EC_KEY
     putlog(LOG_SERV, "*", "SASL: Received EC message, but no TLS EC libs "
            "present. Try PLAIN method");
     return 1;
@@ -528,21 +552,7 @@ botname);
   }
   return 0;
 }
-
-static int gotauthenticate(char *from, char *msg)
-{
-  fixcolon(msg); /* Because Inspircd does its own thing */
-  if (authenticate(from, msg) && !sasl_continue) { /* TODO: check, that we dont call nuke_server() twice
-                                                    * coze i got the feeling, authenticate()
-						    * could have called sasl_error() -> nuke_server()
-						    * already at this point
-						    */
-    putlog(LOG_SERV, "*", "SASL: Aborting connection and retrying");
-    nuke_server("sasl");
-    return 1;
-  }
-  return 0;
-}
+*/
 
 static cmd_t sasl_raw[] = {
   {"901",          "",   (IntFunc) got901,          NULL},
