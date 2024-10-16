@@ -198,6 +198,8 @@ botname);
         client_msg_plain_len = sasl_plain(client_msg_plain);
         break;
       case SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE:
+        client_msg_plain_len = sasl_ecdsa_nist256p_challange(client_msg_plain);
+        break;
       case SASL_MECHANISM_EXTERNAL:
         putlog(LOG_DEBUG, "*", "SASL: put AUTHENTICATE Response +");
         dprintf(DP_MODE, "AUTHENTICATE +\n");
