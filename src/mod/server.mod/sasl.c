@@ -127,6 +127,7 @@ static int sasl_plain(char *client_msg_plain) {
 }
 
 static int sasl_ecdsa_nist256p_challange(char *client_msg_plain) {
+// TODO: place this ifdef/error code into the tcl_TraceVar thats gonna happen soon
 #ifdef HAVE_EVP_PKEY_GET1_EC_KEY
   /* Don't use snprintf() due to \0 inside */
   char *s = client_msg_plain;
