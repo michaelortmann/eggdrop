@@ -42,6 +42,7 @@ static char const *SASL_MECHANISMS[SASL_MECHANISM_NUM] = {
   [SASL_MECHANISM_SCRAM_SHA_512]            = "SCRAM-SHA-512",
 };
 
+/* scram state */
 char nonce[21]; /* atheme defines acceptable client nonce len min 8 max 512 chars
                  * nonce 128 bit = math.ceil(128 / math.log(93, 2)) = 20 chars
                  * 3 major irc clients and postgres use 18, looks like ripping is still a thing ;)
@@ -125,26 +126,17 @@ static int sasl_plain(char *client_msg_plain) {
   return s - client_msg_plain;
 }
 
-static void sasl_ecdsa_nist256p_challange(char *s) {
+static int sasl_ecdsa_nist256p_challange(char *client_msg_plain) {
 #ifdef HAVE_EVP_PKEY_GET1_EC_KEY
-  strcpy(s, sasl_username);
-  s += strlen(sasl_username) + 1;
-  strcpy(s, sasl_username);
-  s += strlen(sasl_username);
+  /* Don't use snprintf() due to \0 inside */
+  char *s = client_msg_plain;
+  s = stpcpy(s, sasl_username) + 1;
+  s = stpcpy(s, sasl_username);
+  return s - client_msg_plain;
 #else
   sasl_error("TLS libs not present or missing EC support. Try the PLAIN, "
              "EXTERNAL or SCRAM method instead");
 #endif /* HAVE_EVP_PKEY_GET1_EC_KEY */
-}
-
-static void sasl_external(char *dst) {
-#ifdef TLS /* TLS required for EXTERNAL sasl */
-  dst[0] = '+';
-  dst[1] = 0;
-#else
-  sasl_error("TLS libs required for EXTERNAL but are not installed, try PLAIN"
-             " method");
-#endif /* TLS */
 }
 
 static void sasl_scram(int *client_first_message_len) {
@@ -178,6 +170,10 @@ static void sasl_scram(int *client_first_message_len) {
  *     The response is encoded in Base64 (RFC 4648), then split to
  *       400-byte chunks, and each chunk is sent as a separate AUTHENTICATE
  *       command.
+ *   check sasl-mechanism-settingin set/change via tcl_TraceVar
+ *     in case of EXTERNAL and no ifndef tls reject / log like:
+ *       "TLS libs required for EXTERNAL but are not installed, try PLAIN method");
+ *     to keep this the old error message
  */
 static int gotauthenticate(char *from, char *msg)
 {
@@ -191,7 +187,7 @@ static int gotauthenticate(char *from, char *msg)
   putlog(LOG_DEBUG, "*", "SASL: got AUTHENTICATE %s", msg);
   fixcolon(msg); /* Because Inspircd does its own thing */
   if (msg[0] == '+') {
-    if (!*sasl_username) {
+    if (!*sasl_username) { /* TODO: mind. fuer EXTERNAL muessen wir das nicht machen */
       putlog(LOG_SERV, "*",
              "SASL: sasl-username not set, setting it to username %s",
 botname);
@@ -203,6 +199,9 @@ botname);
         break;
       case SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE:
       case SASL_MECHANISM_EXTERNAL:
+        putlog(LOG_DEBUG, "*", "SASL: put AUTHENTICATE Response +");
+        dprintf(DP_MODE, "AUTHENTICATE +\n");
+        return 0;
       case SASL_MECHANISM_SCRAM_SHA_256:
       case SASL_MECHANISM_SCRAM_SHA_512:
     }
@@ -210,7 +209,7 @@ botname);
   }
   if (b64_ntop((unsigned char *) client_msg_plain, client_msg_plain_len, client_msg_b64, sizeof client_msg_b64) == -1) {
     sasl_error("AUTHENTICATE: could not base64 encode");
-    return 1;
+    return 0;
   }
   putlog(LOG_DEBUG, "*", "SASL: put AUTHENTICATE Response %s", client_msg_b64);
   dprintf(DP_MODE, "AUTHENTICATE %s\n", client_msg_b64);
@@ -248,12 +247,8 @@ static int authenticate_old(char *from, char *msg)
         dst[0] = 0;
         if (b64_ntop((unsigned char *) src, s - src, dst, sizeof dst) == -1)
           putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: could not base64 "
-                 "encode");
+       "encode");
         break;
-      case SASL_MECHANISM_EXTERNAL:
-        dst[0] = 0;
-        sasl_external(dst);
-	return 1;
       case SASL_MECHANISM_SCRAM_SHA_256:
       case SASL_MECHANISM_SCRAM_SHA_512:
 	int client_first_message_len;
@@ -606,7 +601,7 @@ static void sasl_check_conf() {
 #else  /* TLS */
     if ((sasl_mechanism == SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE) ||
         (sasl_mechanism == SASL_MECHANISM_EXTERNAL)) {
-      fatal("ERROR: The selected SASL authentication method requires TLS "
+      fatal("ERROR: The selected SASL amsgentication method requires TLS "
             "libraries which are not installed on this machine. Please "
             "choose the PLAIN method in your config.", 0);
     }
