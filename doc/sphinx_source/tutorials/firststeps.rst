@@ -156,7 +156,11 @@ Simple Authentication and Security Layer (SASL) is becoming a prevalant method o
 
   You will need to determine your public key fingerprint by using::
 
-    openssl ec -noout -text -conv_form compressed -in eggdrop-ecdsa.pem | grep '^pub:' -A 3 | tail -n 3 | tr -d ' \n:' | xxd -r -p | base64
+    openssl ec -noout -text -conv_form compressed -in eggdrop-ecdsa.pem 2>/dev/null | grep '^pub:' -A 3 | tail -n 3 | tr -d ' \n:' | xxd -r -p | base64
+
+  If error "xxd: command not found" you could install vim, because xxd is a part of vim, or you could try python::
+
+    openssl ec -noout -text -conv_form compressed -in eggdrop-ecdsa.pem 2>/dev/null| grep '^pub:' -A 3 | tail -n 3 | tr -d ' \n:' | python -c "import base64,sys;print(base64.b64encode(bytearray.fromhex(sys.stdin.readline())).decode())"
 
   Then, authenticate with your NickServ service and register your public certificate with NickServ. You can view your public key  On Libera for example, it is done by::
 
@@ -173,3 +177,7 @@ You will need to determine your public key fingerprint by using::
 Then, ensure you have those keys loaded in the ssl-privatekey and ssl-certificate settings in the config file. Finally, to add this certificate to your NickServ account, type::
 
     /msg NickServ cert add <fingerprint string from above goes here>
+
+Alternatively you could connect via ssl and if NickServ supports it, make it automatically determine and add your fingerprint in just the right format:
+
+    /msg NickServ cert add
