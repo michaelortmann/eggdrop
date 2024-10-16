@@ -619,6 +619,10 @@ static void sasl_start() {
  * later messages. The initial client message specifies the SASL mechanism to
  * be used.
 */
+/* TODO: aktuell versucht eggdrop EXTERNAL ueber non-ssl verbindung, das kann doch nicht
+ * funktionieren, oder? also sollte eggdrop da eine warnung loggen und es gar nicht
+ * erst versuchen.
+ */
 int sasl_authenticate_initial(const struct cap_values *cap_value_list) {
   char msg[128];
   putlog(LOG_DEBUG, "*", "SASL: Starting authentication process");
