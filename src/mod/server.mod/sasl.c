@@ -560,19 +560,15 @@ static char *traced_sasl_mechanism(ClientData cdata, Tcl_Interp *irp,
     return "sasl-mechanism is not set to an allowed value, please check it "
            "and try again";
 #ifndef TLS
-  if ((sasl_mechanism == SASL_MECHANISM_EXTERNAL) ||
-      (sasl_mechanism == SASL_MECHANISM_SCRAM_SHA_256) ||
-      (sasl_mechanism == SASL_MECHANISM_SCRAM_SHA_512) ||
-      (sasl_mechanism == SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE)) {
+  if (sasl_mechanism != SASL_MECHANISM_PLAIN)
     return "The selected SASL authentication method requires TLS libraries "
            "which are not installed on this machine. Please choose the PLAIN "
-           "method in your config.";
-  }
+           "method.";
 #endif /* TLS */
 #ifndef HAVE_EVP_PKEY_GET1_EC_KEY
   if (sasl_mechanism == SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE)
-    return "NIST256 functionality missing from your TLS libs, please choose a"
-           "different SASL method.";
+    return "NIST256P functionality missing from your TLS libs, please choose "
+           "a different SASL method";
 #endif /* HAVE_EVP_PKEY_GET1_EC_KEY */
   return NULL;
 }
@@ -641,24 +637,8 @@ int sasl_authenticate_initial(const struct cap_values *cap_value_list) {
     sasl_error(msg);
     return 1;
   }
-#ifndef HAVE_EVP_PKEY_GET1_EC_KEY
-  if (sasl_mechanism != SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE) {
-#endif
-    putlog(LOG_DEBUG, "*", "SASL: AUTHENTICATE %s", SASL_MECHANISMS[sasl_mechanism]);
-    dprintf(DP_MODE, "AUTHENTICATE %s\n", SASL_MECHANISMS[sasl_mechanism]);
-    sasl_timeout_time = sasl_timeout;
-#ifndef HAVE_EVP_PKEY_GET1_EC_KEY
-  } else {
-#ifdef TLS
-    sasl_error("TLS libs missing EC support, try PLAIN or EXTERNAL method, aborting authentication");
-    return 1;
-  }
-#else /* TLS */
-  if (sasl_mechanism != SASL_MECHANISM_PLAIN) {
-    sasl_error("TLS libs not present, try PLAIN method, aborting authentication");
-    return 1;
-  }
-#endif /* TLS */
-#endif /* HAVE_EVP_PKEY */
+  putlog(LOG_DEBUG, "*", "SASL: AUTHENTICATE %s", SASL_MECHANISMS[sasl_mechanism]);
+  dprintf(DP_MODE, "AUTHENTICATE %s\n", SASL_MECHANISMS[sasl_mechanism]);
+  sasl_timeout_time = sasl_timeout;
   return 0;
 }
