@@ -529,7 +529,7 @@ void putlog (int type, char *chname, const char *format, ...)
   /* Create the timestamp */
   if (shtime) {
     tsl = strftime(stamp, sizeof(stamp) - 2, log_ts, t);
-    stamp[tsl++] = ' ');
+    stamp[tsl++] = ' ';
     stamp[tsl] = 0;
   }
   else

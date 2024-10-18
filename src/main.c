@@ -768,7 +768,7 @@ static void mainloop(int toplevel)
           /* Traffic stats */
           if (dcc[idx].type->name) {
             if (!strncmp(dcc[idx].type->name, "BOT", 3))
-              itraffic_bn_today += strlen(buf) + 1;
+              itraffic_bn_today += strlen(buf) + 1; // TODO: sockgets() already returns len into i, why nur use i instead of the strlen()s here?
             else if (!strcmp(dcc[idx].type->name, "SERVER"))
               itraffic_irc_today += strlen(buf) + 1;
             else if (!strncmp(dcc[idx].type->name, "CHAT", 4))
