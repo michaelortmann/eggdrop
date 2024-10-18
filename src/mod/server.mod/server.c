@@ -2012,7 +2012,8 @@ static void server_secondly()
   deq_msg();
   if (!resolvserv && serv < 0)
     connect_server();
-  sasl_secondly();
+  else
+    sasl_secondly();
 }
 
 static void server_5minutely()
