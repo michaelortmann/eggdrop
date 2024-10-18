@@ -552,6 +552,31 @@ static int authenticate_old(char *from, char *msg)
 }
 */
 
+static char *traced_sasl_mechanism(ClientData cdata, Tcl_Interp *irp,
+                                   EGG_CONST char *name1,
+                                   EGG_CONST char *name2, int flags)
+{
+  if ((sasl_mechanism < 0) || (sasl_mechanism >= SASL_MECHANISM_NUM))
+    return "sasl-mechanism is not set to an allowed value, please check it "
+           "and try again";
+#ifndef TLS
+  if ((sasl_mechanism == SASL_MECHANISM_EXTERNAL) ||
+      (sasl_mechanism == SASL_MECHANISM_SCRAM_SHA_256) ||
+      (sasl_mechanism == SASL_MECHANISM_SCRAM_SHA_512) ||
+      (sasl_mechanism == SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE)) {
+    return "The selected SASL authentication method requires TLS libraries "
+           "which are not installed on this machine. Please choose the PLAIN "
+           "method in your config.";
+  }
+#endif /* TLS */
+#ifndef HAVE_EVP_PKEY_GET1_EC_KEY
+  if (sasl_mechanism == SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE)
+    return "NIST256 functionality missing from your TLS libs, please choose a"
+           "different SASL method.";
+#endif /* HAVE_EVP_PKEY_GET1_EC_KEY */
+  return NULL;
+}
+
 static cmd_t sasl_raw[] = {
   {"901",          "",   (IntFunc) got901,          NULL},
   {"902",          "",   (IntFunc) gotsasl90X,      NULL},
@@ -584,35 +609,15 @@ static void sasl_close() {
   rem_builtins(H_raw, sasl_raw);
   rem_tcl_ints(sasl_tcl_ints);
   rem_tcl_strings(sasl_tcl_strings);
-}
-
-/* TODO: fatal? only check on eggdrop start?
- * does this function overlap with sasl_start_authenticate() ? */
-static void sasl_check_conf() {
-  if (sasl) {
-    if ((sasl_mechanism < 0) || (sasl_mechanism >= SASL_MECHANISM_NUM)) {
-      fatal("ERROR: sasl-mechanism is not set to an allowed value, please "
-            "check it and try again", 0);
-    }
-#ifdef TLS
-#ifndef HAVE_EVP_PKEY_GET1_EC_KEY
-    if (sasl_mechanism == SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE) {
-      fatal("ERROR: NIST256 functionality missing from your TLS libs, please "
-            "choose a different SASL method", 0);
-    }
-#endif /* HAVE_EVP_PKEY_GET1_EC_KEY */
-#else  /* TLS */
-    if ((sasl_mechanism == SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE) ||
-        (sasl_mechanism == SASL_MECHANISM_EXTERNAL)) {
-      fatal("ERROR: The selected SASL amsgentication method requires TLS "
-            "libraries which are not installed on this machine. Please "
-            "choose the PLAIN method in your config.", 0);
-    }
-#endif /* TLS */
-  }
+  Tcl_UntraceVar(interp, "sasl-mechanism",
+                 TCL_TRACE_WRITES | TCL_TRACE_UNSETS, traced_sasl_mechanism,
+                 NULL);
 }
 
 static void sasl_start() {
+  Tcl_TraceVar(interp, "sasl-mechanism",
+               TCL_TRACE_WRITES | TCL_TRACE_UNSETS, traced_sasl_mechanism,
+               NULL);
   add_builtins(H_raw, sasl_raw);
   add_tcl_ints(sasl_tcl_ints);
   add_tcl_strings(sasl_tcl_strings);
@@ -629,12 +634,6 @@ static void sasl_start() {
 int sasl_authenticate_initial(const struct cap_values *cap_value_list) {
   char msg[128];
   putlog(LOG_DEBUG, "*", "SASL: Starting authentication process");
-  if ((sasl_mechanism < 0) || (sasl_mechanism >= SASL_MECHANISM_NUM)) {
-    snprintf(msg, sizeof msg, "authentication mechanism %i not supported",
-             sasl_mechanism);
-    sasl_error(msg);
-    return 1;
-  }
   if (!is_cap_value(cap_value_list, SASL_MECHANISMS[sasl_mechanism])) {
     snprintf(msg, sizeof msg,
              "authentication mechanism %s not supported by server",
