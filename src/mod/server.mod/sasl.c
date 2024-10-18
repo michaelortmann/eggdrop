@@ -11,7 +11,7 @@
                * (dietlibc) */
 #include <resolv.h> /* base64 encode b64_ntop() and base64 decode b64_pton() */
 
-/* Available sasl mechanisms. */
+/* Available sasl mechanisms */
 enum {
   SASL_MECHANISM_PLAIN,
   SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE,
@@ -41,6 +41,8 @@ static char const *SASL_MECHANISMS[SASL_MECHANISM_NUM] = {
   [SASL_MECHANISM_SCRAM_SHA_256]            = "SCRAM-SHA-256",
   [SASL_MECHANISM_SCRAM_SHA_512]            = "SCRAM-SHA-512",
 };
+
+int step = 0; // state machine
 
 /* scram state */
 char nonce[21]; /* atheme defines acceptable client nonce len min 8 max 512 chars
@@ -126,33 +128,124 @@ static int sasl_plain(char *client_msg_plain) {
   return s - client_msg_plain;
 }
 
-static int sasl_ecdsa_nist256p_challange(char *client_msg_plain) {
-// TODO: place this ifdef/error code into the tcl_TraceVar thats gonna happen soon
-#ifdef HAVE_EVP_PKEY_GET1_EC_KEY
+static int sasl_ecdsa_nist256p_challange_step_0(char *client_msg_plain) {
   /* Don't use snprintf() due to \0 inside */
   char *s = client_msg_plain;
   s = stpcpy(s, sasl_username) + 1;
   s = stpcpy(s, sasl_username);
   return s - client_msg_plain;
-#else
-  sasl_error("TLS libs not present or missing EC support. Try the PLAIN, "
-             "EXTERNAL or SCRAM method instead");
-#endif /* HAVE_EVP_PKEY_GET1_EC_KEY */
 }
 
-static void sasl_scram(int *client_first_message_len) {
+static int sasl_ecdsa_nist256p_challange_step_1(char *client_msg_plain, char *server_msg_plain, int server_msg_plain_len) {
+  FILE *fp;
+  char error_msg[256];
+  EVP_PKEY *pkey;
+
+  if (!(fp = fopen(sasl_ecdsa_key, "r"))) {
+    snprintf(error_msg, sizeof error_msg, "AUTHENTICATE error: could not open"
+             " file sasl_ecdsa_key %s: %s\n", sasl_ecdsa_key,
+             strerror(errno));
+    sasl_error(error_msg);
+    return -1;
+  }
+  if (!(pkey = PEM_read_PrivateKey(fp, NULL, 0, NULL))) {
+    snprintf(error_msg, sizeof error_msg, "AUTHENTICATE: "
+             "PEM_read_PrivateKey(): SSL error = %s\n",
+             ERR_error_string(ERR_get_error(), 0));
+    sasl_error(error_msg);
+    fclose(fp);
+    return -1;
+  }
+  fclose(fp);
+#if OPENSSL_VERSION_NUMBER >= 0x10000000L /* 1.0.0 */
+  EVP_PKEY_CTX *ctx;
+  size_t siglen;
+
+  /* The EVP interface to digital signatures should almost always be used in
+   * preference to the low level interfaces.
+   */
+  if (!(ctx = EVP_PKEY_CTX_new(pkey, NULL))) {
+    snprintf(error_msg, sizeof error_msg, "AUTHENTICATE: EVP_PKEY_CTX_new(): "
+             "SSL error = %s\n", ERR_error_string(ERR_get_error(), 0));
+    sasl_error(error_msg);
+    return -1;
+  }
+  EVP_PKEY_free(pkey);
+  if (EVP_PKEY_sign_init(ctx) <= 0) {
+    snprintf(error_msg, sizeof error_msg, "AUTHENTICATE: EVP_PKEY_sign_init():"
+             "SSL error = %s\n", ERR_error_string(ERR_get_error(), 0));
+    sasl_error(error_msg);
+    EVP_PKEY_CTX_free(ctx);
+    return -1;
+  }
+  if (EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) <= 0) {
+    snprintf(error_msg, sizeof error_msg, "AUTHENTICATE: "
+             "EVP_PKEY_CTX_set_signature_md(): SSL error = %s\n",
+             ERR_error_string(ERR_get_error(), 0));
+    sasl_error(error_msg);
+    EVP_PKEY_CTX_free(ctx);
+    return -1;
+  }
+  /* EVP_PKEY_sign() must be used instead of EVP_DigestSign*() and EVP_Sign*(),
+   * because EVP_PKEY_sign() does not hash the data to be signed.
+   * EVP_PKEY_sign() is for signing digests, EVP_DigestSign*() and EVP_Sign*()
+   * are for signing messages.
+   */
+  if (EVP_PKEY_sign(ctx, NULL, &siglen, (unsigned char *) server_msg_plain, server_msg_plain_len) <= 0) {
+    snprintf(error_msg, sizeof error_msg, "AUTHENTICATE: EVP_PKEY_sign(): SSL"
+             " error = %s\n", ERR_error_string(ERR_get_error(), 0));
+    sasl_error(error_msg);
+    EVP_PKEY_CTX_free(ctx);
+    return -1;
+  }
+  if (EVP_PKEY_sign(ctx, client_msg_plain, &siglen, (unsigned char *) server_msg_plain, server_msg_plain_len) <= 0) {
+    snprintf(error_msg, sizeof error_msg, "AUTHENTICATE: EVP_PKEY_sign(): SSL"
+             " error = %s\n", ERR_error_string(ERR_get_error(), 0));
+    sasl_error(error_msg);
+    EVP_PKEY_CTX_free(ctx);
+    return -1;
+  }
+  EVP_PKEY_CTX_free(ctx);
+#else
+  EC_KEY *eckey;
+  int ret;
+  unsigned int siglen;
+
+  eckey = EVP_PKEY_get1_EC_KEY(pkey);
+  EVP_PKEY_free(pkey);
+  if (!eckey) {
+    snprintf(error_msg, sizeof error_msg, "AUTHENTICATE: "
+             "EVP_PKEY_get1_EC_KEY(): SSL error = %s\n",
+             ERR_error_string(ERR_get_error(), 0));
+    sasl_error(error_msg);
+    return -1;
+  }
+  sig = nmalloc(ECDSA_size(eckey));
+  ret = ECDSA_sign(0, server_msg_plain, server_msg_plain_len, client_msg_plain, &siglen, eckey);
+  EC_KEY_free(eckey);
+  if (!ret) {
+    snprintf(error_msg, sizeof error_msg, "AUTHENTICATE: ECDSA_sign() SSL "
+             "error = %s\n", ERR_error_string(ERR_get_error(), 0));
+    sasl_error(error_msg);
+    return -1;
+  } 
+#endif /* OPENSSL_VERSION_NUMBER >= 0x10000000L */
+  return siglen;
+}
+
+static void sasl_scram(char *client_msg_plain, int *client_msg_plain_len) {
   /* RFC 5802 - printable ASCII characters excluding ',' - printable = %x21-2B / %x2D-7E */
   #define CHARSET_SCRAM "\x21\x22\x23\x24\x25\x26\x27\x28\x29\x2a\x2b\x2d\x2e\x2f\x30\x31\x32\x33\x34\x35\x36\x37\x38\x39\x3a\x3b\x3c\x3d\x3e\x3f\x40\x41\x42\x43\x44\x45\x46\x47\x48\x49\x4a\x4b\x4c\x4d\x4e\x4f\x50\x51\x52\x53\x54\x55\x56\x57\x58\x59\x5a\x5b\x5c\x5d\x5e\x5f\x60\x61\x62\x63\x64\x65\x66\x67\x68\x69\x6a\x6b\x6c\x6d\x6e\x6f\x70\x71\x72\x73\x74\x75\x76\x77\x78\x79\x7a\x7b\x7c\x7d\x7e"
   make_rand_str_from_chars(nonce, (sizeof nonce) - 1, CHARSET_SCRAM); /* TODO: after sasl scram we should make this func return unbiased / uniformed randoms */
   nonce[(sizeof nonce) - 1] = 0;
   
-  *client_first_message_len = snprintf(client_first_message, sizeof client_first_message, "n,,n=%s,r=%s", sasl_username, nonce);
+  *client_msg_plain_len = snprintf(client_msg_plain, sizeof client_msg_plain, "n,,n=%s,r=%s", sasl_username, nonce);
   printf("DEBUG: src = >>>%s<<<\n", client_first_message);
 }
 
 /* TODO:
  *   modularize
- *     this function is currently 36 lines long
+ *     this function is currently 52 lines long
  *     aim is final version <= 70 lines
  *   state machine, at least for scram
  *   handle final server msg for scram, not implemented yet
@@ -167,19 +260,15 @@ static void sasl_scram(int *client_first_message_len) {
  *   support authenticate split by 400 byte, like:
  *     https://github.com/ircv3/ircv3-specifications/commit/838ef397385065bbc5c29d934bbb407e5b5a5ce5
  *     400-byte chunk, see: https://ircv3.net/specs/extensions/sasl-3.1.html
- *       base64 padding
+*       base64 padding
  *     The response is encoded in Base64 (RFC 4648), then split to
  *       400-byte chunks, and each chunk is sent as a separate AUTHENTICATE
  *       command.
- *   check sasl-mechanism-settingin set/change via tcl_TraceVar
- *     in case of EXTERNAL and no ifndef tls reject / log like:
- *       "TLS libs required for EXTERNAL but are not installed, try PLAIN method");
- *     to keep this the old error message
  */
 static int gotauthenticate(char *from, char *msg)
 {
   char client_msg_plain[1024];
-  size_t client_msg_plain_len;
+  size_t client_msg_plain_len;  
   #ifndef MAX
   #define MAX(a,b) (((a)>(b))?(a):(b))
   #endif
@@ -187,7 +276,7 @@ static int gotauthenticate(char *from, char *msg)
 
   putlog(LOG_DEBUG, "*", "SASL: got AUTHENTICATE %s", msg);
   fixcolon(msg); /* Because Inspircd does its own thing */
-  if (msg[0] == '+') {
+  if (*msg == '+') {
     if (!*sasl_username) { /* TODO: mind. fuer EXTERNAL muessen wir das nicht machen */
       putlog(LOG_SERV, "*",
              "SASL: sasl-username not set, setting it to username %s",
@@ -198,8 +287,8 @@ botname);
       case SASL_MECHANISM_PLAIN:
         client_msg_plain_len = sasl_plain(client_msg_plain);
         break;
-      case SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE:
-        client_msg_plain_len = sasl_ecdsa_nist256p_challange(client_msg_plain);
+  case SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE:
+        client_msg_plain_len = sasl_ecdsa_nist256p_challange_step_0(client_msg_plain);
         break;
       case SASL_MECHANISM_EXTERNAL:
         putlog(LOG_DEBUG, "*", "SASL: put AUTHENTICATE Response +");
@@ -209,6 +298,18 @@ botname);
       case SASL_MECHANISM_SCRAM_SHA_512:
     }
   } else {
+    int server_msg_plain_len;
+    char server_msg_plain[1024];
+
+    if ((server_msg_plain_len = b64_pton(msg, (unsigned char*) server_msg_plain, sizeof server_msg_plain)) == -1) {
+      sasl_error("AUTHENTICATE: could not base64 decode line from server");
+      return 0;
+    }
+    if (sasl_mechanism == SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE)
+      if ((client_msg_plain_len = sasl_ecdsa_nist256p_challange_step_1(client_msg_plain, server_msg_plain, server_msg_plain_len)) < 0)
+        return 0;
+    else
+      server_msg_plain[server_msg_plain_len] = 0; // a little reminder to null terminate result of b64_pton()
   }
   if (b64_ntop((unsigned char *) client_msg_plain, client_msg_plain_len, client_msg_b64, sizeof client_msg_b64) == -1) {
     sasl_error("AUTHENTICATE: could not base64 encode");
@@ -222,41 +323,13 @@ botname);
 /* TODO: remove after gotauthenticate() is done
 static int authenticate_old(char *from, char *msg)
 {
-
-
-
-	
-#ifdef HAVE_EVP_PKEY_GET1_EC_KEY
-  FILE *fp;
-  EVP_PKEY *pkey;
-  unsigned char *sig;
-#if OPENSSL_VERSION_NUMBER >= 0x10000000L /* 1.0.0
-  EVP_PKEY_CTX *ctx;
-  size_t siglen;
-#else
-  EC_KEY *eckey;
-  int ret;
-  unsigned int siglen;
-#endif /* OPENSSL_VERSION_NUMBER >= 0x10000000L
-#endif /* HAVE_EVP_PKEY_GET1_EC_KEY
-
   size_t srclen;
-  char server_first_message[1024]; /* TODO: size ?
-/*
-  int server_first_message_len;
+  
 
-      case SASL_MECHANISM_ECDSA_NIST256P_CHALLENGE:
-	sasl_ecdsa_nist256p_challange(s);
-        dst[0] = 0;
-        if (b64_ntop((unsigned char *) src, s - src, dst, sizeof dst) == -1)
-          putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: could not base64 "
-       "encode");
-        break;
-      case SASL_MECHANISM_SCRAM_SHA_256:
-      case SASL_MECHANISM_SCRAM_SHA_512:
+
+  case SASL_MECHANISM_SCRAM_SHA_512:
 	int client_first_message_len;
 	sasl_scram(&client_first_message_len);
-	/* alle diese funktionen  sollten die laenge zurueckgeben die base64 dann jicht mitr strlen erneut suchen muss
         if (b64_ntop((unsigned char *) src, client_first_message_len, dst, sizeof dst) == -1)
           sasl_error("SASL: AUTHENTICATE error: could not base64 encode");
         putlog(LOG_DEBUG, "*", "SASL: put AUTHENTICATE %s", dst);
@@ -266,8 +339,6 @@ static int authenticate_old(char *from, char *msg)
   } else {
 // TODO: state machine for sasl scram
     putlog(LOG_DEBUG, "*", "SASL: got AUTHENTICATE Challenge");
-
-
 
 
 
@@ -446,12 +517,11 @@ static int authenticate_old(char *from, char *msg)
 
 
 
-
-
       printf("DEBUG: client_final_message_without_proof = >>>%s<<<\n", client_final_message_without_proof);
 
       srclen = snprintf(src, sizeof src, "%s,p=%s", client_final_message_without_proof, client_proof_b64);
       printf("DEBUG: src = >>>%s<<<\n", src);
+
       if (b64_ntop((unsigned char *) src, srclen, dst, sizeof dst) == -1) {
         putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: could not base64 encode");
         return 1;
@@ -459,97 +529,6 @@ static int authenticate_old(char *from, char *msg)
       putlog(LOG_DEBUG, "*", "SASL: put AUTHENTICATE %s", dst);
       dprintf(DP_MODE, "AUTHENTICATE %s\n", dst);
     }
-   } else {
-#ifdef HAVE_EVP_PKEY_GET1_EC_KEY
-    fp = fopen(sasl_ecdsa_key, "r");
-    if (!fp) {
-      putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: could not open file "
-             "sasl_ecdsa_key %s: %s\n", sasl_ecdsa_key, strerror(errno));
-      return 1;
-    }
-    pkey = PEM_read_PrivateKey(fp, NULL, 0, NULL);
-    if (!pkey) {
-      putlog(LOG_SERV, "*", "SASL: AUTHENTICATE: PEM_read_PrivateKey(): SSL "
-             "error = %s\n", ERR_error_string(ERR_get_error(), 0));
-      fclose(fp);
-      return 1;
-    }
-    fclose(fp);
-#if OPENSSL_VERSION_NUMBER >= 0x10000000L /* 1.0.0 */
-    /* The EVP interface to digital signatures should almost always be used in
-     * preference to the low level interfaces.
-    if (!(ctx = EVP_PKEY_CTX_new(pkey, NULL))) {
-      putlog(LOG_SERV, "*", "SASL: AUTHENTICATE: EVP_PKEY_CTX_new(): SSL error = %s\n",
-             ERR_error_string(ERR_get_error(), 0));
-      return 1;
-    }
-    EVP_PKEY_free(pkey);
-    if (EVP_PKEY_sign_init(ctx) <= 0) {
-      putlog(LOG_SERV, "*", "SASL: AUTHENTICATE: EVP_PKEY_sign_init(): SSL error = %s\n",
-             ERR_error_string(ERR_get_error(), 0));
-      EVP_PKEY_CTX_free(ctx);
-      return 1;
-    
-    }
-    if (EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) <= 0) {
-      putlog(LOG_SERV, "*", "SASL: AUTHENTICATE: EVP_PKEY_CTX_set_signature_md(): SSL error = %s\n",
-             ERR_error_string(ERR_get_error(), 0));
-      EVP_PKEY_CTX_free(ctx);
-      return 1;
-    }
-    /* EVP_PKEY_sign() must be used instead of EVP_DigestSign*() and EVP_Sign*(),
-     * because EVP_PKEY_sign() does not hash the data to be signed.
-     * EVP_PKEY_sign() is for signing digests, EVP_DigestSign*() and EVP_Sign*()
-     * are for signing messages.
-     *
-    if (EVP_PKEY_sign(ctx, NULL, &siglen, (unsigned char*) dst, server_first_message_len) <= 0) {
-      putlog(LOG_SERV, "*", "SASL: AUTHENTICATE: EVP_PKEY_sign(): SSL error = %s\n",
-             ERR_error_string(ERR_get_error(), 0));
-      EVP_PKEY_CTX_free(ctx);
-      return 1;
-    }
-    sig = nmalloc(siglen);
-    if (EVP_PKEY_sign(ctx, sig, &siglen, (unsigned char *) dst, server_first_message_len) <= 0) {
-      putlog(LOG_SERV, "*", "SASL: AUTHENTICATE: EVP_PKEY_sign(): SSL error = %s\n",
-             ERR_error_string(ERR_get_error(), 0));
-      nfree(sig);
-      EVP_PKEY_CTX_free(ctx); 
-      return 1;
-    }
-    EVP_PKEY_CTX_free(ctx);
-#else
-    eckey = EVP_PKEY_get1_EC_KEY(pkey);
-    EVP_PKEY_free(pkey);
-    if (!eckey) {
-      putlog(LOG_SERV, "*", "SASL: AUTHENTICATE: EVP_PKEY_get1_EC_KEY(): SSL error = %s\n",
-             ERR_error_string(ERR_get_error(), 0));
-      return 1;
-    }
-    sig = nmalloc(ECDSA_size(eckey));
-    ret = ECDSA_sign(0, dst, server_first_message_len, sig, &siglen, eckey);
-    EC_KEY_free(eckey);
-    if (!ret) {
-      putlog(LOG_SERV, "*", "SASL: AUTHENTICATE: ECDSA_sign() SSL error = %s\n",
-             ERR_error_string(ERR_get_error(), 0));
-      nfree(sig);
-      return 1;
-    } 
-#endif /* OPENSSL_VERSION_NUMBER >= 0x10000000L
-    if (b64_ntop(sig, siglen, dst, sizeof dst) == -1) {
-      putlog(LOG_SERV, "*", "SASL: AUTHENTICATE error: could not base64 encode");
-      nfree(sig);
-      return 1;
-    }
-    nfree(sig);
-    
-#endif /* HAVE_EVP_PKEY_GET1_EC_KEY
-    putlog(LOG_SERV, "*", "SASL: Received EC message, but no TLS EC libs "
-           "present. Try PLAIN method");
-    return 1;
-    }
-  }
-  return 0;
-}
 */
 
 static char *traced_sasl_mechanism(ClientData cdata, Tcl_Interp *irp,
@@ -628,13 +607,13 @@ static void sasl_start() {
  * erst versuchen.
  */
 int sasl_authenticate_initial(const struct cap_values *cap_value_list) {
-  char msg[128];
+  char error_msg[128];
   putlog(LOG_DEBUG, "*", "SASL: Starting authentication process");
   if (!is_cap_value(cap_value_list, SASL_MECHANISMS[sasl_mechanism])) {
-    snprintf(msg, sizeof msg,
+    snprintf(error_msg, sizeof error_msg,
              "authentication mechanism %s not supported by server",
              SASL_MECHANISMS[sasl_mechanism]); /* TODO: report server supported mechanisms */
-    sasl_error(msg);
+    sasl_error(error_msg);
     return 1;
   }
   putlog(LOG_DEBUG, "*", "SASL: AUTHENTICATE %s", SASL_MECHANISMS[sasl_mechanism]);
