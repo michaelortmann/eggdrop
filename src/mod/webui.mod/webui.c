@@ -381,8 +381,8 @@ static size_t escape_html(char *dst, char *src, size_t size) {
                    ((unsigned char) src[i + 2] == '1') &&
                    ((unsigned char) src[i + 3] == 'm')) {
             *d++ = '<';
-            *d++ = 'b';
             *d++ = '/';
+            *d++ = 'b';
             *d++ = '>';
           } else
             debug3("webui: escape_html(): unknown escape sequence found, skipping, %x %x %x, PLEASE REPORT THIS BUG",
