@@ -34,6 +34,7 @@
 #include <openssl/sha.h>
 #include "src/version.h"
 
+#define AUTH_KEY  "Authorization: Basic"
 #define WS_GUID   "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 #define WS_KEY    "Sec-WebSocket-Key:"
 #define WS_KEYLEN 24 /* key is padded, so its always 24 bytes */
@@ -103,6 +104,7 @@ static void put_file(int idx, int file_cache_index) {
   int fd, i;
   char *response;
 
+  debug2("webui: put_file() filename %s idx %i", f->filename, idx);
   if (stat(f->filename, &sb) < 0) {
     putlog(LOG_MISC, "*", "WEBUI error: fstat(%s): %s", f->filename, strerror(errno));
     return;
@@ -156,7 +158,7 @@ static void webui_http_activity(int idx, char *buf, int len)
 {
   struct rusage ru1, ru2;
   int r, i;
-  char *response;
+  char *response, auth_plain[NICKLEN + 1 + PASSWORDLEN + 1];
 
   if (len < 6) { /* TODO: better len check */
     putlog(LOG_MISC, "*",
@@ -180,7 +182,45 @@ static void webui_http_activity(int idx, char *buf, int len)
   buf[len] = '\0'; /* TODO: is there no better way? we already know len */
   if (buf[5] == ' ') {
     debug0("webui: GET /");
-    put_file(idx, 2);
+    buf = strstr(buf, AUTH_KEY);
+    if (!buf) {
+      debug1("webui: put 401 idx %i", idx);
+      i = snprintf(NULL, 0,
+        "HTTP/1.1 401 Unauthorized\r\n"
+        // "Connection: close\r\n"
+        "Content-Length: 0\r\n"
+        "Server: %s\r\n"
+        "WWW-Authenticate: Basic realm=\"\"\r\n"
+        "\r\n",
+        stealth_telnets ? "nginx/1.28.0" : "Eggdrop/" EGG_STRINGVER "+" EGG_PATCH);
+      response = nmalloc(i + 1);
+      sprintf(response,
+        "HTTP/1.1 401 Unauthorized\r\n"
+        // "Connection: close\r\n"
+        "Content-Length: 0\r\n"
+        "Server: %s\r\n"
+        "WWW-Authenticate: Basic realm=\"\"\r\n"
+        "\r\n",
+        stealth_telnets ? "nginx/1.28.0" : "Eggdrop/" EGG_STRINGVER "+" EGG_PATCH);
+      tputs(dcc[idx].sock, response, i);
+      nfree(response);
+    } else {
+      buf += sizeof AUTH_KEY;
+      len = strstr(buf, "\r") - buf;
+      if (!len) {
+        putlog(LOG_MISC, "*", "WEBUI error: could not find end of Authorization header field");
+        put_404(idx);
+      } else {
+        buf[len] = 0;
+        if ((len = b64_pton(buf, (unsigned char*) auth_plain, sizeof auth_plain)) == -1) {
+          putlog(LOG_MISC, "*", "WEBUI error: could not base64 decode Authorization header field");
+          put_404(idx);
+        } else {
+          debug2("DEBUG: %s len %i", auth_plain, len);
+          put_file(idx, 2);
+        }
+      }
+    }
   } else if (buf[5] == 'f') {
     debug0("webui: GET /favicon.ico");
     put_file(idx, 1);
