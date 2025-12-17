@@ -1440,7 +1440,7 @@ static void dcc_telnet_hostresolved(int i)
   }
 
 #ifdef TLS
-  /* Skip ident lookup for webui http */
+  /* Delay ident lookup for webui http until websocket */
   if (!strcmp(dcc[idx].nick, "(webui)")) {
     webui_dcc_telnet_hostresolved(i);
     return;
@@ -1573,7 +1573,7 @@ void dupwait_notify(char *who)
     }
 }
 
-static void dcc_telnet_id(int idx, char *buf, int atr)
+void dcc_telnet_id(int idx, char *buf, int atr)
 {
   int ok = 0;
   struct flag_record fr = { FR_GLOBAL | FR_CHAN | FR_ANYWH, 0, 0, 0, 0, 0 };
@@ -2452,4 +2452,6 @@ static void dcc_telnet_got_ident(int i, char *host)
     if (allow_new_telnets)
       dprintf(i, "(If you are new, enter 'NEW' here.)\n");
   }
+  if (!strcmp(dcc[idx].nick, "(webui)"))
+    webui_dcc_telnet_got_ident(i);
 }

@@ -366,6 +366,12 @@ static void webui_dcc_telnet_hostresolved(int i)
     // dcc[i].u.other = NULL; /* important, else nfree() error in lostdcc on eof */
 }
 
+static void webui_dcc_telnet_got_ident(int i)
+{
+    debug1("webui_dcc_telnet_got_ident(%i)", i);
+    dcc_telnet_id(i, handle, handle_len);
+}
+
 /* TODO: add bounds checking or use existing function under MIT/GPL license
  *       instead of our own code
  */
@@ -537,6 +543,7 @@ static char *webui_close(void)
   int idx;
 
   del_hook(HOOK_DCC_TELNET_HOSTRESOLVED, (Function) webui_dcc_telnet_hostresolved);
+  del_hook(HOOK_DCC_TELNET_GOT_IDENT, (Function) webui_dcc_telnet_got_ident);
   del_hook(HOOK_WEBUI_FRAME, (Function) webui_frame);
   del_hook(HOOK_WEBUI_UNFRAME, (Function) webui_unframe);
   for (idx = 0; idx < dcc_total; idx++) {
@@ -571,6 +578,7 @@ char *webui_start(Function *global_funcs)
     return "This module requires Eggdrop 1.10.0 or later.";
   }
   add_hook(HOOK_DCC_TELNET_HOSTRESOLVED, (Function) webui_dcc_telnet_hostresolved);
+  add_hook(HOOK_DCC_TELNET_GOT_IDENT, (Function) webui_dcc_telnet_got_ident);
   add_hook(HOOK_WEBUI_FRAME, (Function) webui_frame);
   add_hook(HOOK_WEBUI_UNFRAME, (Function) webui_unframe);
   return NULL;
