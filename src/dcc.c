@@ -69,7 +69,7 @@ char stealth_prompt[81] = "\n\nNickname.\n"; /* stealth_telnet prompt string  */
 
 static void dcc_telnet_hostresolved(int);
 static void dcc_telnet_got_ident(int, char *);
-static void dcc_telnet_pass(int, int);
+static void dcc_telnet_pass(int);
 
 
 /* This is not a universal telnet detector. You need to send WILL STATUS to the
@@ -1512,7 +1512,7 @@ static void timeout_dupwait(int idx)
     lostdcc(idx);
   } else {
     /* Ha! Now it's gone and we can grant this bot access. */
-    dcc_telnet_pass(idx, dcc[idx].u.dupwait->atr);
+    dcc_telnet_pass(idx);
   }
 }
 
@@ -1568,7 +1568,7 @@ void dupwait_notify(char *who)
   for (idx = 0; idx < dcc_total; idx++)
     if ((dcc[idx].type == &DCC_DUPWAIT) &&
         !strcasecmp(dcc[idx].nick, who)) {
-      dcc_telnet_pass(idx, dcc[idx].u.dupwait->atr);
+      dcc_telnet_pass(idx);
       break;
     }
 }
@@ -1696,7 +1696,7 @@ static void dcc_telnet_id(int idx, char *buf, int atr)
       return;
     }
   }
-  dcc_telnet_pass(idx, atr);
+  dcc_telnet_pass(idx);
 }
 
 #ifdef TLS
@@ -1737,7 +1737,7 @@ int dcc_fingerprint(int idx)
 }
 #endif
 
-static void dcc_telnet_pass(int idx, int atr)
+static void dcc_telnet_pass(int idx)
 {
   int ok = 0;
   struct flag_record fr = { FR_GLOBAL | FR_CHAN | FR_ANYWH, 0, 0, 0, 0, 0 };

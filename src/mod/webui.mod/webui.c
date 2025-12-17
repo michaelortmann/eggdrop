@@ -51,6 +51,9 @@ static Function *global = NULL;
  */
 static const uint8_t alert[] = {0x15, 0x03, 0x01, 0x00, 0x02, 0x02, 0x0a};
 
+char auth_plain[NICKLEN + 1 + PASSWORDLEN + 1], *handle, *pass;
+size_t handle_len, pass_len;
+
 static void webui_http_eof(int idx)
 {
   debug2("webui: webui_http_eof() idx %i sock %li", idx, dcc[idx].sock);
@@ -158,7 +161,7 @@ static void webui_http_activity(int idx, char *buf, int len)
 {
   struct rusage ru1, ru2;
   int r, i;
-  char *response, auth_plain[NICKLEN + 1 + PASSWORDLEN + 1];
+  char *response;
 
   if (len < 6) { /* TODO: better len check */
     putlog(LOG_MISC, "*",
@@ -207,20 +210,31 @@ static void webui_http_activity(int idx, char *buf, int len)
     } else {
       buf += sizeof AUTH_KEY;
       len = strstr(buf, "\r") - buf;
-      if (!len) {
+      if (len) {
+        buf[len] = 0;
+        if ((len = b64_pton(buf, (unsigned char*) auth_plain, sizeof auth_plain)) > -1) {
+          if ((pass = strchr(auth_plain, ':'))) {
+            handle = auth_plain;
+            handle_len = pass - auth_plain;
+            *pass++ = 0;
+            pass_len = len - handle_len - 1;
+            put_file(idx, 2);
+          } else {
+            putlog(LOG_MISC, "*", "WEBUI error: bogus Authorization header field");
+            put_404(idx);
+            return;
+          }
+        } else {
+           putlog(LOG_MISC, "*", "WEBUI error: could not base64 decode Authorization header field");
+           put_404(idx);
+           return;
+        }
+      } else {
         putlog(LOG_MISC, "*", "WEBUI error: could not find end of Authorization header field");
         put_404(idx);
-      } else {
-        buf[len] = 0;
-        if ((len = b64_pton(buf, (unsigned char*) auth_plain, sizeof auth_plain)) == -1) {
-          putlog(LOG_MISC, "*", "WEBUI error: could not base64 decode Authorization header field");
-          put_404(idx);
-        } else {
-          debug2("DEBUG: %s len %i", auth_plain, len);
-          put_file(idx, 2);
-        }
-      }
-    }
+        return;
+       }
+     }
   } else if (buf[5] == 'f') {
     debug0("webui: GET /favicon.ico");
     put_file(idx, 1);
@@ -296,7 +310,7 @@ static void webui_http_activity(int idx, char *buf, int len)
         break;
       }
 
-    dcc[idx].u.other = NULL; /* fix ATTEMPTING TO FREE NON-MALLOC'D PTR: dccutil.c (561) */
+    // dcc[idx].u.other = NULL; /* fix ATTEMPTING TO FREE NON-MALLOC'D PTR: dccutil.c (561) */
     dcc_telnet_hostresolved2(idx, i);
 
     debug2("webui: CHANGEOVER -> idx %i sock %li", idx, dcc[idx].sock);
@@ -349,7 +363,7 @@ static void webui_dcc_telnet_hostresolved(int i)
     changeover_dcc(i, &DCC_WEBUI_HTTP, 0);
     sockoptions(dcc[i].sock, EGG_OPTION_SET, SOCK_BINARY);
     sockoptions(dcc[i].sock, EGG_OPTION_UNSET, SOCK_BUFFER);
-    dcc[i].u.other = NULL; /* important, else nfree() error in lostdcc on eof */
+    // dcc[i].u.other = NULL; /* important, else nfree() error in lostdcc on eof */
 }
 
 /* TODO: add bounds checking or use existing function under MIT/GPL license
