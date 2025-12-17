@@ -56,6 +56,7 @@ extern int (*rfc_tolower) (int);
 extern int (*match_noterej) (struct userrec *, char *);
 extern void (*webui_dcc_telnet_hostresolved) (int);
 extern void (*webui_dcc_telnet_got_ident) (int);
+extern void (*webui_dcc_telnet_pass) (int);
 extern size_t (*webui_frame) (char **, char *, size_t);
 extern void (*webui_unframe) (char *, int *);
 #endif
@@ -142,6 +143,7 @@ int dcc_fingerprint(int);
 #endif
 void dcc_telnet_hostresolved2(int, int);
 void dcc_telnet_id(int, char *, int);
+void dcc_chat_pass(int, char *, int);
 
 /* dccutil.c */
 int increase_socks_max(void);

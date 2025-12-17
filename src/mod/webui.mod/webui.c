@@ -51,6 +51,8 @@ static Function *global = NULL;
  */
 static const uint8_t alert[] = {0x15, 0x03, 0x01, 0x00, 0x02, 0x02, 0x0a};
 
+// TODO: mage sure the whole webui http auth is without interruption for a single conection
+// else, auth data must be per connection and not a single global
 char auth_plain[NICKLEN + 1 + PASSWORDLEN + 1], *handle, *pass;
 size_t handle_len, pass_len;
 
@@ -372,6 +374,12 @@ static void webui_dcc_telnet_got_ident(int i)
     dcc_telnet_id(i, handle, handle_len);
 }
 
+static void webui_dcc_telnet_pass(int i)
+{
+    debug1("webui_dcc_telnet_pass(%i)", i);
+    dcc_chat_pass(i, pass, pass_len);
+}
+
 /* TODO: add bounds checking or use existing function under MIT/GPL license
  *       instead of our own code
  */
@@ -544,6 +552,7 @@ static char *webui_close(void)
 
   del_hook(HOOK_DCC_TELNET_HOSTRESOLVED, (Function) webui_dcc_telnet_hostresolved);
   del_hook(HOOK_DCC_TELNET_GOT_IDENT, (Function) webui_dcc_telnet_got_ident);
+  del_hook(HOOK_DCC_TELNET_PASS, (Function) webui_dcc_telnet_pass);
   del_hook(HOOK_WEBUI_FRAME, (Function) webui_frame);
   del_hook(HOOK_WEBUI_UNFRAME, (Function) webui_unframe);
   for (idx = 0; idx < dcc_total; idx++) {
@@ -579,6 +588,7 @@ char *webui_start(Function *global_funcs)
   }
   add_hook(HOOK_DCC_TELNET_HOSTRESOLVED, (Function) webui_dcc_telnet_hostresolved);
   add_hook(HOOK_DCC_TELNET_GOT_IDENT, (Function) webui_dcc_telnet_got_ident);
+  add_hook(HOOK_DCC_TELNET_PASS, (Function) webui_dcc_telnet_pass);
   add_hook(HOOK_WEBUI_FRAME, (Function) webui_frame);
   add_hook(HOOK_WEBUI_UNFRAME, (Function) webui_unframe);
   return NULL;

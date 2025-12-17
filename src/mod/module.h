@@ -531,8 +531,9 @@ typedef void (*chanout_butfunc)(int, int, const char *, ...) ATTRIBUTE_FORMAT(pr
 #define dcc_telnet_hostresolved2 ((void(*)(int, int))global[326])
 #define dcc_telnet_id ((void(*)(int, char *, int))global[327])
 /* 328 - 331 */
-#define findsock ((int(*)(int))global[328])
-#define stealth_telnets (*(int *)(global[329]))
+#define dcc_chat_pass ((void(*)(int, char *, int))global[328])
+#define findsock ((int(*)(int))global[329])
+#define stealth_telnets (*(int *)(global[330]))
 
 
 /* hostmasking */

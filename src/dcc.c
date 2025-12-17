@@ -639,7 +639,7 @@ static int dcc_bot_check_digest(int idx, char *remote_digest)
   return 0;
 }
 
-static void dcc_chat_pass(int idx, char *buf, int atr)
+void dcc_chat_pass(int idx, char *buf, int atr)
 {
   char pass[PASSWORDLEN];
 
@@ -1742,6 +1742,7 @@ static void dcc_telnet_pass(int idx)
   int ok = 0;
   struct flag_record fr = { FR_GLOBAL | FR_CHAN | FR_ANYWH, 0, 0, 0, 0, 0 };
 
+  printf("dcc_telnet_pass(%i)\n", idx);
   get_user_flagrec(dcc[idx].user, &fr, NULL);
 #ifdef TLS
   /* Check if fingerprint authentication is allowed or required. */
@@ -1852,6 +1853,8 @@ static void dcc_telnet_pass(int idx)
     } else
       dprintf(idx, "\n%s\n", DCC_ENTERPASS);
   }
+  if (dcc[idx].status & STAT_WS)
+    webui_dcc_telnet_pass(idx);
 }
 
 static void eof_dcc_telnet_id(int idx)
@@ -2452,6 +2455,6 @@ static void dcc_telnet_got_ident(int i, char *host)
     if (allow_new_telnets)
       dprintf(i, "(If you are new, enter 'NEW' here.)\n");
   }
-  if (!strcmp(dcc[idx].nick, "(webui)"))
+  if (dcc[i].status & STAT_WS)
     webui_dcc_telnet_got_ident(i);
 }

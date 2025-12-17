@@ -59,8 +59,9 @@
 #define HOOK_VERIFY_PASS2            117
 #define HOOK_DCC_TELNET_HOSTRESOLVED 118
 #define HOOK_DCC_TELNET_GOT_IDENT    119
-#define HOOK_WEBUI_FRAME             120
-#define HOOK_WEBUI_UNFRAME           121
+#define HOOK_DCC_TELNET_PASS         120
+#define HOOK_WEBUI_FRAME             121
+#define HOOK_WEBUI_UNFRAME           122
 
 /* These are FIXED once they are in a release they STAY */
 #define MODCALL_START             0
