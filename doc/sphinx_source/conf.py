@@ -21,7 +21,7 @@
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
-#needs_sphinx = '1.0'
+needs_sphinx = '8.2'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
@@ -42,7 +42,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Eggdrop'
-copyright = u'2025, Eggheads'
+copyright = u'2026, Eggheads'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -51,7 +51,7 @@ copyright = u'2025, Eggheads'
 # The short X.Y version.
 version = '1.10.2'
 # The full version, including alpha/beta/rc tags.
-release = '1.10.2rc2'
+release = '1.10.2'
 # Just X.Y, for use in doc links (Geo)
 maj_version = ".".join(version.split(".")[:2])
 
