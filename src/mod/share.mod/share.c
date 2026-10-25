@@ -1466,15 +1466,18 @@ ATTRIBUTE_FORMAT(printf,2,3)
 static void shareout_mod(struct chanset_t *chan, const char *format, ...)
 {
   int i, l;
-  char s[601];
+  char s[511];
   va_list va;
 
   if (!chan || channel_shared(chan)) {
     va_start(va, format);
 
     strcpy(s, "s ");
-    if ((l = vsnprintf(s + 2, 509, format, va)) >= 509) {
+    // Keep \n when truncating
+    if (((l = vsnprintf(s + 2, 509, format, va)) >= 509) || ((l == 508) && (s[509] != '\n'))) {
       debug0("shareout_mod(): truncated to 508 bytes");
+      s[509] = '\n';
+      s[510] = 0;
       l = 508;
     }
     for (i = 0; i < dcc_total; i++)
@@ -1499,14 +1502,19 @@ ATTRIBUTE_FORMAT(printf,3,4)
 static void shareout_but(struct chanset_t *chan, int x, const char *format, ...)
 {
   int i, l;
-  char s[601];
+  char s[511];
   va_list va;
 
   va_start(va, format);
 
   strcpy(s, "s ");
-  if ((l = vsnprintf(s + 2, 509, format, va)) < 0)
-    s[2 + (l = 509)] = 0;
+  // Keep \n when truncating
+  if (((l = vsnprintf(s + 2, 509, format, va)) >= 509) || ((l == 508) && (s[509] != '\n'))) {
+    debug0("shareout_buf(): truncated to 508 bytes");
+    s[509] = '\n';
+    s[510] = 0;
+    l = 508;
+  }
   for (i = 0; i < dcc_total; i++)
     if ((dcc[i].type->flags & DCT_BOT) && (i != x) &&
         (dcc[i].status & STAT_SHARE) &&
